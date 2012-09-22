@@ -1,0 +1,12 @@
+{application, cake,
+ [
+  {description, "CakeDB - now you can have your cake and eat it!"},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { cake_app, []}},
+  {env, []}
+ ]}.

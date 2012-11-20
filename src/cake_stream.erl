@@ -23,7 +23,7 @@
 
 
 
--export([init/3,writer_init/3,timestamp_as_binary/0]).
+-export([init/3,writer_init/3,timestamp_as_native_binary/0]).
 
 init(Stream,StreamID,SliceName) ->
 
@@ -54,10 +54,10 @@ loop(Writer,DataList,ClearToSend,LastTS,Count) ->
 				Data ->
 
 					{ok,CompressedData} = snappy:compress(Data),
-					TS = timestamp_as_binary(),
+					TS = timestamp_as_native_binary(),
 					
 					PayloadLength = erlang:byte_size(CompressedData),
-					Store = <<TS/binary,PayloadLength:32/big-integer,CompressedData/binary>>,
+					Store = <<TS/binary,PayloadLength:32/native-integer,CompressedData/binary>>,
 					NewDataList = [Store|DataList],
 
 					case ClearToSend of
@@ -124,13 +124,13 @@ writer(Details) ->
 	case (Details#stream_state.byte_counter) > 52428800 of
 		true ->
 			lager:debug("Adding index for '~p' at '~p' after 50MB written",[Details#stream_state.stream_name,Details#stream_state.last_ts]),
-			ok = file:write((Details#stream_state.index_file),<<(Details#stream_state.last_ts)/binary,?SIZE_INDEX:8/big-integer,(Details#stream_state.total_bytes):64/big-integer>>),
+			ok = file:write((Details#stream_state.index_file),<<(Details#stream_state.last_ts)/binary,?SIZE_INDEX:8/native-integer,(Details#stream_state.total_bytes):64/native-integer>>),
 			writer(Details#stream_state{byte_counter=0});
 		false -> 
 			case (Details#stream_state.message_count) > 1000 of
 				true ->
 					lager:debug("Adding index for '~p' at '~p' after 1,000 inserts",[Details#stream_state.stream_name,Details#stream_state.last_ts]),
-					ok = file:write((Details#stream_state.index_file),<<(Details#stream_state.last_ts)/binary,?COUNT_INDEX:8/big-integer,(Details#stream_state.total_bytes):64/big-integer>>),
+					ok = file:write((Details#stream_state.index_file),<<(Details#stream_state.last_ts)/binary,?COUNT_INDEX:8/native-integer,(Details#stream_state.total_bytes):64/native-integer>>),
 					writer(Details#stream_state{message_count=0});
 				false -> ok
 			end
@@ -154,10 +154,10 @@ writer(Details) ->
 
 
 
-timestamp_as_binary() ->
+timestamp_as_native_binary() ->
         {Mega, Sec, Micro} = now(),
         TS = Mega * 1000000 * 1000000 + Sec * 1000000 + Micro,
-        <<TS:64/big-integer>>.
+        <<TS:64/native-integer>>.
 
 
 

@@ -13,7 +13,7 @@ print_all(<<>>,Count) ->
 	io:format("Total records: ~p~n",[Count]),
 	ok;
 print_all(Data,Count) ->
-	<<TS:64/big-integer,Size:32/big-integer,Compressed:Size/binary,TheRest/binary>> = Data,
+	<<TS:64/native-integer,Size:32/native-integer,Compressed:Size/binary,TheRest/binary>> = Data,
 	{ok,Decompressed} = snappy:decompress(Compressed),
 	io:format("~p|~p|~p~n",[TS,Size,Decompressed]),
 	print_all(TheRest,Count + 1).
@@ -31,13 +31,13 @@ all_since_query(StreamID,From) ->
 
 all_since_query(DataFile,FoundData,From) ->
     case file:read(DataFile,12) of
-        {ok,<<TS:64/big-integer,Size:32/big-integer>>} ->
+        {ok,<<TS:64/native-integer,Size:32/native-integer>>} ->
             case file:read(DataFile,Size) of
                 {ok,CompressedData} -> case Size == byte_size(CompressedData) of
                                                 true -> case TS > From of
                                                             true -> {ok,Decompressed} = snappy:decompress(CompressedData),
                                                                 DecompressedSize = byte_size(Decompressed),
-                                                                all_since_query(DataFile,[<<TS:64/big-integer,DecompressedSize:32/big-integer,Decompressed/binary>>|FoundData],From);
+                                                                all_since_query(DataFile,[<<TS:64/native-integer,DecompressedSize:32/native-integer,Decompressed/binary>>|FoundData],From);
                                                             false -> all_since_query(DataFile,FoundData,From)
                                                         end;
                                                 false -> all_since_query(DataFile,FoundData,From)
@@ -60,7 +60,7 @@ dump_index(<<>>,Count) ->
     io:format("Total records: ~p~n",[Count]),
     ok;
 dump_index(Data,Count) ->
-    <<TS:64/big-integer,Type:8/big-integer,ByteLocation:64/big-integer,TheRest/binary>> = Data,
+    <<TS:64/native-integer,Type:8/native-integer,ByteLocation:64/native-integer,TheRest/binary>> = Data,
     
     io:format("~p|~p|~p~n",[TS,Type,ByteLocation]),
     dump_index(TheRest,Count + 1).
@@ -75,7 +75,7 @@ get_indexed_offset(StreamID,From) ->
 get_indexed_offset(<<>>,_From,Offset) ->
     Offset;
 get_indexed_offset(Data,From,Offset) ->
-    <<TS:64/big-integer,_Type:8/big-integer,ByteLocation:64/big-integer,TheRest/binary>> = Data,
+    <<TS:64/native-integer,_Type:8/native-integer,ByteLocation:64/native-integer,TheRest/binary>> = Data,
     case From > TS of
         true -> get_indexed_offset(TheRest,From,ByteLocation);
         false -> Offset

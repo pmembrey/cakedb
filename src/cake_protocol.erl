@@ -30,7 +30,7 @@ loop(Socket, Transport) ->
 
 			folsom_metrics:notify({<<"msg_per_sec">>, 1}),
 
-			statsderl:increment("total_inbound_messages",1, 0.005),
+			%statsderl:increment("total_inbound_messages",1, 0.005),
 
 
 			case Type of

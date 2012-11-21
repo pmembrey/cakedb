@@ -65,6 +65,13 @@ loop(Writer,DataList,ClearToSend,LastTS,Count) ->
 							Writer ! {Count,TS,lists:reverse(NewDataList)},
 							loop(Writer,[],false,TS,0);
 						false ->
+						    case Count > 1000 of
+                            	true ->
+                                	lager:warning("~p has more than 1,000 messages pending - sending message by force!",[self()]),
+                                    Writer ! {Count,TS,lists:reverse(NewDataList)},
+                                    loop(Writer,[],false,TS,0);
+                                false -> ok
+                            end,
 							lager:debug("Got data but not clear to send!"),
 							loop(Writer,NewDataList,false,TS,Count+1)
 					end

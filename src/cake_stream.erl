@@ -53,11 +53,10 @@ loop(Writer,DataList,ClearToSend,LastTS,Count) ->
 
 				Data ->
 
-					{ok,CompressedData} = snappy:compress(Data),
 					TS = timestamp_as_native_binary(),
 					
-					PayloadLength = erlang:byte_size(CompressedData),
-					Store = <<TS/binary,PayloadLength:32/native-integer,CompressedData/binary>>,
+					PayloadLength = erlang:byte_size(Data),
+					Store = <<TS/binary,PayloadLength:32/native-integer,Data/binary>>,
 					NewDataList = [Store|DataList],
 
 					case ClearToSend of

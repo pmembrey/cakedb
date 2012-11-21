@@ -33,11 +33,9 @@ all_since_query(DataFile,FoundData,From) ->
     case file:read(DataFile,12) of
         {ok,<<TS:64/native-integer,Size:32/native-integer>>} ->
             case file:read(DataFile,Size) of
-                {ok,CompressedData} -> case Size == byte_size(CompressedData) of
+                {ok,Data} -> case Size == byte_size(Data) of
                                                 true -> case TS > From of
-                                                            true -> {ok,Decompressed} = snappy:decompress(CompressedData),
-                                                                DecompressedSize = byte_size(Decompressed),
-                                                                all_since_query(DataFile,[<<TS:64/native-integer,DecompressedSize:32/native-integer,Decompressed/binary>>|FoundData],From);
+                                                            true -> all_since_query(DataFile,[<<TS:64/big-integer,Size:32/big-integer,Data/binary>>|FoundData],From);
                                                             false -> all_since_query(DataFile,FoundData,From)
                                                         end;
                                                 false -> all_since_query(DataFile,FoundData,From)

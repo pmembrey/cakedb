@@ -29,8 +29,8 @@ init(_) ->
 
 
     % StatsD Start up
-    application:start(statsderl),
-    application:start(vmstats),
+    %application:start(statsderl),
+    %application:start(vmstats),
 
     % TCP Ranch
     application:start(ranch),

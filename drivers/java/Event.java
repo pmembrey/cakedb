@@ -1,18 +1,17 @@
 package org.cakedb.drivers.java;
 
+/**
+ * Holds event data from Cake. This consists of a timestamp & payload pair.
+ */
 public class Event {
     
-    public int length = 0;
     public long timestamp = 0;
     public byte[] payload = null;
     
-    public Event(long timestamp,int length,byte[] payload){
+    public Event(long timestamp,byte[] payload) {
         
-        this.length = length;
         this.timestamp = timestamp;
         this.payload = payload;
-        
-        
     }
 
 }

@@ -1,243 +1,237 @@
 package org.cakedb.drivers.java;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
+/**
+ * Java driver for CakeDB
+ */
 public class Driver {
 
-	Socket clientSocket = null;
-	OutputStream outToServer = null;
-	InputStream inFromServer = null;
-	HashMap<String, Short> streamIDs = new HashMap<String, Short>();
+	//Cake server hostname/port
+	private String serverHost = "";
+	private int serverPort = 0;
 
+	//socket & network streams
+	private Socket clientSocket = null;
+	private DataOutputStream outToServer = null;
+	private DataInputStream inFromServer = null;
 
+	//id map
+	private HashMap<String, Short> streamIDs = new HashMap<String, Short>();
+	
+	//query types (see cake_protocol.erl)
+	private static final int DB_NOOP = 0;
+	private static final int DB_REQUEST_STREAM_WITH_SIZE = 1;
+	private static final int DB_APPEND = 2;
+	private static final int DB_QUERY = 3;
+	private static final int DB_ALL_SINCE = 4;
+	private static final int DB_REQUEST_STREAM = 5;
 
-	public Driver(String hostName,int port) throws Exception{
-
-		// Set up socket and related streams
-		clientSocket = new Socket(hostName, port);
-		outToServer  = clientSocket.getOutputStream();
-		inFromServer = clientSocket.getInputStream();
+	private static final int SIZE_SHORT = Short.SIZE/8;
+	private static final int SIZE_INT = Integer.SIZE/8;
+	private static final int SIZE_LONG = Long.SIZE/8;
+	
+	
+	/** 
+	 * Create a connection to the CakeDB server at this host/port.
+	 * @param hostName
+	 * @param port
+	 * @throws UnknownHostException
+	 * @throws IOException
+	 */
+	public Driver(String hostName,int port) throws UnknownHostException, IOException {
+		
+		this.serverHost = hostName;
+		this.serverPort = port;		
+		
+		reconnect();
+	}
+	
+	/**
+	 * Reconnect socket connection to the CakeDB server. Useful in case the socket
+	 * connection fails for any reason.
+	 */
+	public void reconnect() throws UnknownHostException, IOException {
+		
+		// Try clean shutdown of old socket if needed
+		if(clientSocket != null)
+		{
+			try {
+				clientSocket.close();
+			} catch(IOException e)
+			{}
+		}
+		
+		// Reconnect socket and related streams
+		clientSocket = new Socket(serverHost, serverPort);
+		outToServer  = new DataOutputStream(clientSocket.getOutputStream());
+		inFromServer = new DataInputStream(clientSocket.getInputStream());
 	}
 
-	public void storeString(String streamName,String payload) throws IOException {
+	/**
+	 * Helper method to store a string. Equivalent to 
+	 * <pre>
+	 * store(streamName, payload.getBytes());
+	 * </pre> 
+	 */
+	public void store(String streamName,String payload) throws IOException {
 
-		store(streamName,payload.getBytes());
-
+		store(streamName, payload.getBytes());
 	}
 
-	public synchronized void store(String streamName,byte[] payload) throws IOException{
+	/**
+	 * Store data to CakeDB
+	 * @param streamName
+	 * @param payload
+	 * @throws IOException
+	 */
+	public synchronized void store(String streamName,byte[] payload) throws IOException {
+		
+		short streamID = getStreamID(streamName); 	        // Get Stream ID
+		int payloadLength = SIZE_SHORT + payload.length;  	// Calculate message length
+		short op = DB_APPEND; 					            // Set operation		
 
-		// Allocate buffer for header
-		ByteBuffer storeBuffer = ByteBuffer.allocate(8);
-		// Get Stream ID
-		short streamID = getStreamID(streamName);
-		// Calculate message length
-		int payloadLength = payload.length + 2;
-		// Set type to STORE
-		short type = 2;		
-		// Load header into the byte buffer
-		storeBuffer.putInt(payloadLength);
-		storeBuffer.putShort(type);
-		storeBuffer.putShort(streamID);
-		// Write header and payload to socket
-		outToServer.write(storeBuffer.array());
+		writeHeader(payloadLength, op);		
+		outToServer.writeShort(streamID);
 		outToServer.write(payload);
-
-
-	
+		outToServer.flush();
 	}
 
-	
-	
-	public synchronized ArrayList<Event> rangeQuery(String streamName,long from, long to) throws IOException{
+	/**
+	 * Standard header is a 4-byte contents length, followed by 2-byte message type  
+	 * @throws IOException 
+	 */
+	private void writeHeader(int payloadLength, short operation) throws IOException {
+		outToServer.writeInt(payloadLength);
+		outToServer.writeShort(operation);
+	}
+
+	/**
+	 * Retrieve all records between these two timestamps
+	 * @param streamName
+	 * @param from In UNIX epoch format e.g. that returned by Date().getTime();
+	 * @param to In UNIX epoch format e.g. that returned by Date().getTime();
+	 * @return
+	 * @throws IOException
+	 */
+	public synchronized List<Event> rangeQuery(String streamName,long from, long to) throws IOException {
 		
-		//Allocate buffer
-		ByteBuffer storeBuffer = ByteBuffer.allocate(24);
-		// Get Stream ID
-		short streamID = getStreamID(streamName);
-		// Set type to RANGE_QUERY
-		short type = 3;
-		storeBuffer.putInt(18);
-		storeBuffer.putShort(type);
-		storeBuffer.putShort(streamID);
-		storeBuffer.putLong(from);
-		storeBuffer.putLong(to);
-		outToServer.write(storeBuffer.array());
+		short streamID = getStreamID(streamName);			// Get Stream ID
+		short op = DB_QUERY;								
+
+		//send query
+		writeHeader(SIZE_SHORT + SIZE_LONG + SIZE_LONG, op);
+		outToServer.writeShort(streamID);
+		outToServer.writeLong(from);
+		outToServer.writeLong(to);
+		outToServer.flush();
 		
-		// Need the length
-		
-		// Allocate buffer for reply
-		ByteBuffer reply = ByteBuffer.allocate(4);
-		// Read the two byte reply
-		reply.put((byte)inFromServer.read());
-		reply.put((byte)inFromServer.read());
-		reply.put((byte)inFromServer.read());
-		reply.put((byte)inFromServer.read());
-		// Rewind buffer
-		reply.rewind();
-		// Read off the short
-		int length = reply.getInt();
+		// Get the incoming stream length
+		int length = inFromServer.readInt();	
 		System.out.println("Length: " + length + "\n");
-		
-		byte[] buf = new byte[length];
-		int offset = 0;
-		int remainingLength = length;
-		
-		while(remainingLength >0){
-		
-		int in = inFromServer.read(buf, offset, remainingLength);
-		offset = offset + in;
-		remainingLength = remainingLength - in;
-		}
-		
-		ArrayList<Event> list = new ArrayList<Event>();
-		
-		// Get first length 
-		ByteBuffer x = ByteBuffer.wrap(buf);
-		int counter = 0;
-		while(x.hasRemaining()){
-		counter++;
-		
-		long timestamp = x.getLong();
-		int firstLength = x.getInt();
-
-		
-		byte[] temp = new byte[firstLength];
-		x.get(temp, 0, firstLength);
-		
-		Event event = new Event(timestamp,length,temp);
-		list.add(event);
-
-		
-			
-		}
-		
-		System.out.println("Total count: " + counter);
-		return(list);
-	}
-	
-	
-	
-	public synchronized ArrayList<Event> allSinceQuery(String streamName,long from) throws IOException{
-		
-		//Allocate buffer
-		ByteBuffer storeBuffer = ByteBuffer.allocate(16);
-		// Get Stream ID
-		short streamID = getStreamID(streamName);
-		// Set type to ALL_SINCE_QUERY
-		short type = 4;
-		storeBuffer.putInt(10);
-		storeBuffer.putShort(type);
-		storeBuffer.putShort(streamID);
-		storeBuffer.putLong(from);
-		outToServer.write(storeBuffer.array());
-		
-		// Need the length
-		
-		// Allocate buffer for reply
-		ByteBuffer reply = ByteBuffer.allocate(4);
-		// Read the two byte reply
-		reply.put((byte)inFromServer.read());
-		reply.put((byte)inFromServer.read());
-		reply.put((byte)inFromServer.read());
-		reply.put((byte)inFromServer.read());
-		// Rewind buffer
-		reply.rewind();
-		// Read off the short
-		int length = reply.getInt();
-		//System.out.println("Length: " + length + "\n");
-		
-		byte[] buf = new byte[length];
-		int offset = 0;
-		int remainingLength = length;
-		
-		while(remainingLength >0){
-		
-		int in = inFromServer.read(buf, offset, remainingLength);
-		offset = offset + in;
-		remainingLength = remainingLength - in;
-		}
-		
-		ArrayList<Event> list = new ArrayList<Event>();
-		
-		// Get first length 
-		ByteBuffer x = ByteBuffer.wrap(buf);
-		int counter = 0;
-		while(x.hasRemaining()){
-		counter++;
-
-		
-		long timestamp = x.getLong();
-		int firstLength = x.getInt();
-		
-		byte[] temp = new byte[firstLength];
-		x.get(temp, 0, firstLength);
-		
-		Event event = new Event(timestamp,length,temp);
-		list.add(event);
 				
-			
-		}
+		//create a buffer & read in rest of stream
+		byte[] buf = new byte[length];
+		inFromServer.readFully(buf);
 		
-	
-		return(list);
+		return extractData(buf);
 	}
 
-	private short getStreamID(String streamName) throws IOException  {
+	/**
+	 * Extract a list of events from a data buffer
+	 */
+	private List<Event> extractData(byte[] buf) {
+		
+		ArrayList<Event> list = new ArrayList<Event>();
+		
+		//iterate through buffer, pulling out events
+		ByteBuffer x = ByteBuffer.wrap(buf);
+		while(x.hasRemaining()){
 
-		// Define streamID
-		short streamID;
-		// Try to fetch ID from HashMap
-		Object x = streamIDs.get(streamName);
-		// What did we get back?
-		if(x==null){
-			// Haven't got an ID for this stream so request from CakeDB
-			streamID = getStreamIDFromServer(streamName);
-			// Stick it in the HashMap for later
-			streamIDs.put(streamName, streamID);
+			long timestamp = x.getLong();
+			int recordLength = x.getInt();
+			
+			byte[] temp = new byte[recordLength];
+			x.get(temp, 0, recordLength);
+			
+			Event event = new Event(timestamp,temp);
+			list.add(event);			
 		}
-		else{
-			// Cast the ID back to a short
-			streamID = (Short)x;
+		
+		System.out.println("Total count: " + list.size());
+		return(list);
+	}
+	
+	/**
+	 * Return all events since this time
+	 * @param streamName
+	 * @param from In UNIX epoch format e.g. that returned by Date().getTime();
+	 * @return
+	 * @throws IOException
+	 */
+	public synchronized List<Event> allSinceQuery(String streamName,long from) throws IOException {
+		
+		short streamID = getStreamID(streamName);			// Get Stream ID
+		short op = DB_ALL_SINCE;								
 
+		//send query
+		writeHeader(SIZE_SHORT + SIZE_LONG, op);
+		outToServer.writeShort(streamID);
+		outToServer.writeLong(from);
+		outToServer.flush();
+
+		// Get the incoming stream length
+		int length = inFromServer.readInt();	
+		System.out.println("Length: " + length + "\n");
+				
+		//create a buffer & read in rest of stream
+		byte[] buf = new byte[length];
+		inFromServer.readFully(buf);
+		
+		return extractData(buf);
+
+	}
+
+	/**
+	 * Get the stream ID. Check the cache if we have it, and if we dont, then
+	 * request from the server.
+	 */
+	private short getStreamID(String streamName) throws IOException {
+
+		// Try to fetch ID from HashMap
+		Short streamID = streamIDs.get(streamName);
+
+		// If we haven't got an ID for this stream, request it from CakeDB
+		if(streamID == null){
+			streamID = getStreamIDFromServer(streamName);
+			streamIDs.put(streamName, streamID);   			// Stick it in the HashMap for later
 		}
 
 		return(streamID);
-
-
 	}
 
 
+	/**
+	 * Get stream ID from Cake server. Send the stream name, and expect a 16bit short in return.
+	 */
 	private short getStreamIDFromServer(String streamName) throws IOException {
 
-		// Calculate length of message
-		int payloadLength = streamName.length();
-		// Set type to REQUEST (1)
-		short type = 5;		
-		// Allocate buffer for header
-		ByteBuffer header = ByteBuffer.allocate(6);
-		// Insert header data
-		header.putInt(payloadLength);
-		header.putShort(type);
-		// Write to socket
-		outToServer.write(header.array());
-		outToServer.write(streamName.getBytes());
-		// Allocate buffer for reply
-		ByteBuffer reply = ByteBuffer.allocate(2);
-		// Read the two byte reply
-		reply.put((byte)inFromServer.read());
-		reply.put((byte)inFromServer.read());
-		// Rewind buffer
-		reply.rewind();
-		// Read off the short
-		return reply.getShort();
+		int payloadLength = streamName.length();				// Calculate length of message
+		short op = DB_REQUEST_STREAM;		
 
+		//send request for this stream name
+		writeHeader(payloadLength, op);		
+		outToServer.write(streamName.getBytes());
+		outToServer.flush();
+
+		return inFromServer.readShort();
 	}
 }

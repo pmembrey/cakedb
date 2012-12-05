@@ -38,9 +38,13 @@ all_since_query(DataFile,FoundData,From) ->
                                                             true -> all_since_query(DataFile,[<<TS:64/big-integer,Size:32/big-integer,Data/binary>>|FoundData],From);
                                                             false -> all_since_query(DataFile,FoundData,From)
                                                         end;
-                                                false -> all_since_query(DataFile,FoundData,From)
+                                                false -> ok = file:close(DataFile),
+                                                         lager:warning("Message: Not enough data - read ~p of ~p bytes",[byte_size(Data),Size]),
+                                                         list_to_binary(lists:flatten(lists:reverse(FoundData)))
                                             end;
-                eof -> all_since_query(DataFile,FoundData,From)  % Not convinced that this is right...
+                eof -> ok = file:close(DataFile),
+                       lager:warning("EOF: Not enough data - attempted to read ~p bytes",[Size]),
+                       list_to_binary(lists:flatten(lists:reverse(FoundData)))
             end;
         _ -> ok = file:close(DataFile), 
             list_to_binary(lists:flatten(lists:reverse(FoundData)))

@@ -34,7 +34,7 @@ retrieve_last_entry_at(StreamID,At) ->
 retrieve_last_entry_at(DataFile,FoundData,At) ->
     case file:read(DataFile,22) of
         {ok,?MESSAGE_HEADER} ->
-            case file:read(DataFile,Size) of
+            case file:read(DataFile,Size+3) of
                 {ok,?MESSAGE} -> case CRC32 == erlang:crc32(Data) of
                                                 true -> case TS > At of
                                                             true -> retrieve_last_entry_at(DataFile,<<TS:64/big-integer,Size:32/big-integer,Data/binary>>,At);
@@ -66,7 +66,7 @@ simple_query(StreamID,From,To) ->
 simple_query(DataFile,FoundData,From,To) ->
     case file:read(DataFile,22) of
         {ok,?MESSAGE_HEADER} ->
-            case file:read(DataFile,Size) of
+            case file:read(DataFile,Size+3) of
                 {ok,?MESSAGE} -> case CRC32 == erlang:crc32(Data) of
                                                 true -> case (TS >= From) and (TS =< To) of
                                                             true -> simple_query(DataFile,[<<TS:64/big-integer,Size:32/big-integer,Data/binary>>|FoundData],From);
@@ -106,7 +106,7 @@ all_since_query(StreamID,From) ->
 all_since_query(DataFile,FoundData,From) ->
     case file:read(DataFile,22) of
         {ok,?MESSAGE_HEADER} ->
-            case file:read(DataFile,Size) of
+            case file:read(DataFile,Size+3) of
                 {ok,?MESSAGE} -> case CRC32 == erlang:crc32(Data) of
                                                 true -> case TS > From of
                                                             true -> all_since_query(DataFile,[<<TS:64/big-integer,Size:32/big-integer,Data/binary>>|FoundData],From);

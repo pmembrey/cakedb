@@ -35,27 +35,36 @@ next_state(S, _V, {call, ?SERVER, register_stream, [Stream]}) ->
         false ->
             StreamID = S#state.counter+1,
             FileName = binary_to_list(Stream),
-            S#state{streams = [{Stream,{StreamID,FileName}}|
-                        [{StreamID,{Stream,FileName}}|S#state.streams]],
-                    counter = StreamID}
+            S#state{
+                counter=StreamID,
+                streams=lists:flatten([
+                        [
+                            {Stream,{StreamID,FileName}},
+                            {StreamID,{Stream,FileName}}
+                        ]
+                    |S#state.streams])}
     end;
 next_state(S, _V, {call, ?SERVER, stream_filename, [_StreamID]}) ->
     S.
 
 postcondition(S, {call, ?SERVER, register_stream, [StreamName]}, Result) ->
-    Stream = proplists:get_value(StreamName,S#state.streams),
-    case Stream of
-        {StreamID, _FileName} ->
+    case proplists:is_defined(StreamName,S#state.streams) of
+        true ->
+            {StreamID,_FileName} =
+                proplists:get_value(StreamName,S#state.streams),
             Result =:= StreamID;
-        undefined ->
+        false ->
             Result =:= S#state.counter + 1
     end;
 postcondition(S, {call, ?SERVER, stream_filename, [StreamID]}, Result) ->
-    Stream = proplists:get_value(StreamID,S#state.streams),
-    case Stream of
-        {_StreamName, FileName} ->
+    case proplists:is_defined(StreamID,S#state.streams) of
+        true ->
+            {_StreamName,FileName} =
+                proplists:get_value(StreamID,S#state.streams),
+            io:format("FileName: ~p\n",[FileName]),
+            io:format("Result: ~p\n\n",[Result]),
             Result =:= FileName;
-        undefined ->
+        false ->
             Result =:= unregistered_stream
     end.
 
@@ -65,16 +74,15 @@ postcondition(S, {call, ?SERVER, stream_filename, [StreamID]}, Result) ->
 
 prop_cake_stream_manager_works() ->
     ?FORALL(Cmds, commands(?MODULE),
-        ?TRAPEXIT(
             begin
-                ?APP:start([],[]),
+                {ok, Pid} = ?APP:start([],[]),
                 {History,State,Result} = run_commands(?MODULE, Cmds),
                 ?APP:stop([]),
                 ?WHENFAIL(
                     io:format("\n\nHistory: ~w\n\nState: ~w\n\nResult: ~w\n\n",
                     [History,State,Result]),
                 aggregate(command_names(Cmds), Result =:= ok))
-            end)).
+            end).
 
 %%-----------------------------------------------------------------------------
 %% generators

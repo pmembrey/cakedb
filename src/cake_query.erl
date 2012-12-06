@@ -14,7 +14,7 @@
 
 
 open_data_file(FileName) ->
-    {ok,DataDir} = application:get_env(cakedb,data_dir),
+    {ok,DataDir} = application:get_env(cake,data_dir),
     {ok,DataFile} = file:open(DataDir ++ FileName ++ "/" ++ FileName ++ ".data",[binary,raw,read,read_ahead]),
     DataFile.
 
@@ -157,7 +157,7 @@ dump_index(Data,Count) ->
 
 get_indexed_offset(StreamID,From) ->
     File = cake_stream_manager:stream_filename(StreamID),
-    {ok,DataDir} = application:get_env(cakedb,data_dir),
+    {ok,DataDir} = application:get_env(cake,data_dir),
     {ok,Data} = file:read_file(DataDir ++ File ++ "/" ++ File ++ ".index"),
     get_indexed_offset(Data,From,0).
 

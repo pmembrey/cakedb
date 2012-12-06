@@ -41,7 +41,7 @@ init(_) ->
 
 
 
-    {ok,DataDir} = application:get_env(cakedb,data_dir),
+    {ok,DataDir} = application:get_env(cake,data_dir),
     filelib:ensure_dir(DataDir),
 
 

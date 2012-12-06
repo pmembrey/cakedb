@@ -70,7 +70,8 @@ prop_cake_stream_manager_works() ->
                 ?APP:start([],[]),
                 {History,State,Result} = run_commands(?MODULE, Cmds),
                 ?APP:stop([]),
-                ?WHENFAIL(io:format("History: ~w\nState: ~w\nResult: ~w\n",
+                ?WHENFAIL(
+                    io:format("\n\nHistory: ~w\n\nState: ~w\n\nResult: ~w\n\n",
                     [History,State,Result]),
                 aggregate(command_names(Cmds), Result =:= ok))
             end)).

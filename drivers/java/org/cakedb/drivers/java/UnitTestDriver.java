@@ -16,7 +16,7 @@ public class UnitTestDriver {
 		try {
 
 			//Cake server to test
-			String cakeHost = "10.2.43.145";
+			String cakeHost = "127.0.0.1";
 			int cakePort = 8888;
 			
 			//get time from a while back, in case clocks arent quite in sync

@@ -101,7 +101,8 @@ loop(Writer,DataList,ClearToSend,LastTS,Count) ->
 
 writer_init(From,Stream,SliceName) ->
 	% First ensure stream directory exists...
-	Path = "data/" ++ binary_to_list(Stream) ++ "/",
+	{ok,DataDir} = application:get_env(cakedb,data_dir),
+	Path = DataDir ++ binary_to_list(Stream) ++ "/",
 	filelib:ensure_dir(Path),
 	DataFile  = Path ++ SliceName ++ ".data",
 	IndexFile = Path ++ SliceName ++ ".index",

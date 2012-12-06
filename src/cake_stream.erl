@@ -56,7 +56,8 @@ loop(Writer,DataList,ClearToSend,LastTS,Count) ->
 					TS = timestamp_as_native_binary(),
 					
 					PayloadLength = erlang:byte_size(Data),
-					Store = <<TS/binary,PayloadLength:32/native-integer,Data/binary>>,
+					Store   = <<1,1,1,TS/binary,PayloadLength:32/native-integer,(erlang:crc32(Data)):32/native-integer,2,2,2,Data/binary,3,3,3>>,
+
 					NewDataList = [Store|DataList],
 
 					case ClearToSend of

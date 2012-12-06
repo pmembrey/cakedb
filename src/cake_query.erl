@@ -8,6 +8,8 @@
 
 
 
+-define(MESSAGE_HEADER,<<1,1,1,TS:64/native-integer,Size:32/native-integer,CRC32:32/native-integer,2,2,2>>).
+-define(MESSAGE,<<Data:Size/binary,3,3,3>>).
 
 
 
@@ -30,16 +32,16 @@ retrieve_last_entry_at(StreamID,At) ->
 
 
 retrieve_last_entry_at(DataFile,FoundData,At) ->
-    case file:read(DataFile,12) of
-        {ok,<<TS:64/native-integer,Size:32/native-integer>>} ->
+    case file:read(DataFile,22) of
+        {ok,?MESSAGE_HEADER} ->
             case file:read(DataFile,Size) of
-                {ok,Data} -> case Size == byte_size(Data) of
+                {ok,?MESSAGE} -> case CRC32 == erlang:crc32(Data) of
                                                 true -> case TS > At of
                                                             true -> retrieve_last_entry_at(DataFile,<<TS:64/big-integer,Size:32/big-integer,Data/binary>>,At);
                                                             false -> retrieve_last_entry_at(DataFile,FoundData,At)
                                                         end;
                                                 false -> ok = file:close(DataFile),
-                                                         lager:warning("Message: Not enough data - read ~p of ~p bytes",[byte_size(Data),Size]),
+                                                         lager:warning("Message: CRC32 Checksum failed on ~p",[TS]),
                                                          FoundData
                                             end;
                 eof -> ok = file:close(DataFile),
@@ -62,10 +64,10 @@ simple_query(StreamID,From,To) ->
 
 
 simple_query(DataFile,FoundData,From,To) ->
-    case file:read(DataFile,12) of
-        {ok,<<TS:64/native-integer,Size:32/native-integer>>} ->
+    case file:read(DataFile,22) of
+        {ok,?MESSAGE_HEADER} ->
             case file:read(DataFile,Size) of
-                {ok,Data} -> case Size == byte_size(Data) of
+                {ok,?MESSAGE} -> case CRC32 == erlang:crc32(Data) of
                                                 true -> case (TS >= From) and (TS =< To) of
                                                             true -> simple_query(DataFile,[<<TS:64/big-integer,Size:32/big-integer,Data/binary>>|FoundData],From);
                                                             false -> case TS < To of 
@@ -75,7 +77,7 @@ simple_query(DataFile,FoundData,From,To) ->
                                                                     end
                                                         end;
                                                 false -> ok = file:close(DataFile),
-                                                         lager:warning("Message: Not enough data - read ~p of ~p bytes",[byte_size(Data),Size]),
+                                                         lager:warning("Message: CRC32 Checksum failed on ~p",[TS]),
                                                          list_to_binary(lists:flatten(lists:reverse(FoundData)))
                                             end;
                 eof -> ok = file:close(DataFile),
@@ -102,16 +104,16 @@ all_since_query(StreamID,From) ->
 
 
 all_since_query(DataFile,FoundData,From) ->
-    case file:read(DataFile,12) of
-        {ok,<<TS:64/native-integer,Size:32/native-integer>>} ->
+    case file:read(DataFile,22) of
+        {ok,?MESSAGE_HEADER} ->
             case file:read(DataFile,Size) of
-                {ok,Data} -> case Size == byte_size(Data) of
+                {ok,?MESSAGE} -> case CRC32 == erlang:crc32(Data) of
                                                 true -> case TS > From of
                                                             true -> all_since_query(DataFile,[<<TS:64/big-integer,Size:32/big-integer,Data/binary>>|FoundData],From);
                                                             false -> all_since_query(DataFile,FoundData,From)
                                                         end;
                                                 false -> ok = file:close(DataFile),
-                                                         lager:warning("Message: Not enough data - read ~p of ~p bytes",[byte_size(Data),Size]),
+                                                         lager:warning("Message: CRC32 Checksum failed on ~p",[TS]),
                                                          list_to_binary(lists:flatten(lists:reverse(FoundData)))
                                             end;
                 eof -> ok = file:close(DataFile),

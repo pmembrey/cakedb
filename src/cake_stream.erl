@@ -56,7 +56,8 @@ loop(Writer,DataList,ClearToSend,LastTS,Count) ->
 					TS = timestamp_as_native_binary(),
 					
 					PayloadLength = erlang:byte_size(Data),
-					Store = <<TS/binary,PayloadLength:32/native-integer,Data/binary>>,
+					Store   = <<1,1,1,TS/binary,PayloadLength:32/native-integer,(erlang:crc32(Data)):32/native-integer,2,2,2,Data/binary,3,3,3>>,
+
 					NewDataList = [Store|DataList],
 
 					case ClearToSend of
@@ -101,7 +102,8 @@ loop(Writer,DataList,ClearToSend,LastTS,Count) ->
 
 writer_init(From,Stream,SliceName) ->
 	% First ensure stream directory exists...
-	Path = "data/" ++ binary_to_list(Stream) ++ "/",
+	{ok,DataDir} = application:get_env(cake,data_dir),
+	Path = DataDir ++ binary_to_list(Stream) ++ "/",
 	filelib:ensure_dir(Path),
 	DataFile  = Path ++ SliceName ++ ".data",
 	IndexFile = Path ++ SliceName ++ ".index",

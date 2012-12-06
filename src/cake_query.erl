@@ -23,7 +23,7 @@ open_data_file(FileName) ->
 
 
 retrieve_last_entry_at(StreamID,At) ->
-    File = cake_stream_manager:stream_filename(StreamID),
+    {ok,File} = cake_stream_manager:stream_filename(StreamID),
     Offset = get_indexed_offset(StreamID,At),
     lager:debug("Offset from get_indexed_offset: ~p", [Offset]),
     DataFile = open_data_file(File),
@@ -36,9 +36,9 @@ retrieve_last_entry_at(DataFile,FoundData,At) ->
         {ok,?MESSAGE_HEADER} ->
             case file:read(DataFile,Size+3) of
                 {ok,?MESSAGE} -> case CRC32 == erlang:crc32(Data) of
-                                                true -> case TS > At of
+                                                true -> case TS < At of
                                                             true -> retrieve_last_entry_at(DataFile,<<TS:64/big-integer,Size:32/big-integer,Data/binary>>,At);
-                                                            false -> retrieve_last_entry_at(DataFile,FoundData,At)
+                                                            false -> retrieve_last_entry_at(DataFile,<<>>,At)
                                                         end;
                                                 false -> ok = file:close(DataFile),
                                                          lager:warning("Message: CRC32 Checksum failed on ~p",[TS]),
@@ -55,7 +55,7 @@ retrieve_last_entry_at(DataFile,FoundData,At) ->
 
 
 simple_query(StreamID,From,To) ->
-    File = cake_stream_manager:stream_filename(StreamID),
+    {ok,File} = cake_stream_manager:stream_filename(StreamID),
     Offset = get_indexed_offset(StreamID,From),
     lager:debug("Offset from get_indexed_offset: ~p", [Offset]),
     DataFile = open_data_file(File),
@@ -69,9 +69,9 @@ simple_query(DataFile,FoundData,From,To) ->
             case file:read(DataFile,Size+3) of
                 {ok,?MESSAGE} -> case CRC32 == erlang:crc32(Data) of
                                                 true -> case (TS >= From) and (TS =< To) of
-                                                            true -> simple_query(DataFile,[<<TS:64/big-integer,Size:32/big-integer,Data/binary>>|FoundData],From);
+                                                            true -> simple_query(DataFile,[<<TS:64/big-integer,Size:32/big-integer,Data/binary>>|FoundData],From,To);
                                                             false -> case TS < To of 
-                                                                        true -> simple_query(DataFile,FoundData,From);
+                                                                        true -> simple_query(DataFile,FoundData,From,To);
                                                                         false -> ok = file:close(DataFile),
                                                                                  list_to_binary(lists:flatten(lists:reverse(FoundData)))
                                                                     end
@@ -95,7 +95,7 @@ simple_query(DataFile,FoundData,From,To) ->
 
 
 all_since_query(StreamID,From) ->
-    File = cake_stream_manager:stream_filename(StreamID),
+    {ok,File} = cake_stream_manager:stream_filename(StreamID),
     Offset = get_indexed_offset(StreamID,From),
     lager:debug("Offset from get_indexed_offset: ~p", [Offset]),
     DataFile = open_data_file(File),
@@ -156,7 +156,7 @@ dump_index(Data,Count) ->
 
 
 get_indexed_offset(StreamID,From) ->
-    File = cake_stream_manager:stream_filename(StreamID),
+    {ok,File} = cake_stream_manager:stream_filename(StreamID),
     {ok,DataDir} = application:get_env(cake,data_dir),
     {ok,Data} = file:read_file(DataDir ++ File ++ "/" ++ File ++ ".index"),
     get_indexed_offset(Data,From,0).

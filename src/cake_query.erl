@@ -1,26 +1,13 @@
 -module(cake_query).
 -compile([{parse_transform, lager_transform}]).
 
--export([return_all/1,
-         all_since_query/2,
+-export([all_since_query/2,
          dump_index/1,
          retrieve_last_entry_at/2,
          simple_query/3]).
 
 
-return_all(FileName) ->
-	{ok,Data} = file:read_file(FileName),
-	print_all(Data,0).
 
-
-print_all(<<>>,Count) ->
-	io:format("Total records: ~p~n",[Count]),
-	ok;
-print_all(Data,Count) ->
-	<<TS:64/native-integer,Size:32/native-integer,Compressed:Size/binary,TheRest/binary>> = Data,
-	{ok,Decompressed} = snappy:decompress(Compressed),
-	io:format("~p|~p|~p~n",[TS,Size,Decompressed]),
-	print_all(TheRest,Count + 1).
 
 
 

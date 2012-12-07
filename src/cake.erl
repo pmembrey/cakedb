@@ -40,12 +40,6 @@ init(_) ->
     process_flag(trap_exit, true),
 
 
-
-    {ok,DataDir} = application:get_env(cake,data_dir),
-    filelib:ensure_dir(DataDir),
-
-
-
     application:start(folsom),
     application:start(cowboy),
     application:start(folsom_cowboy),
@@ -53,10 +47,16 @@ init(_) ->
 
     folsom_metrics:new_meter(<<"msg_per_sec">>),
 
-    cake_stream_manager:start_link(),
 
-    lager:info("CakeDB Ready."),
-	{ok,{}}.
+    {ok,DataDir} = application:get_env(cake,data_dir),
+
+    case filelib:ensure_dir(DataDir) of
+        {error,Reason} -> lager:error("Cannot open '~p': ~p",[DataDir,Reason]);
+        ok -> cake_stream_manager:start_link(),
+              lager:info("CakeDB Ready."),
+              {ok,{}}
+
+    end.
 
 
 

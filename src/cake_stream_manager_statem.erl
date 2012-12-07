@@ -10,8 +10,7 @@
 -record(state,{streams,counter}).
 
 -define(SERVER, cake_stream_manager).
--define(APP, cake_app).
--define(APP_NAME, cake).
+-define(APP, cake).
 -define(STREAMNAMES, [<<"tempfile">>, <<"file001">>, <<"anotherfile">>,
         <<"somefile">>, <<"binfile">>, <<"cakestream">>]).
 
@@ -74,9 +73,9 @@ postcondition(S, {call, ?SERVER, stream_filename, [StreamID]}, Result) ->
 prop_cake_stream_manager_works() ->
     ?FORALL(Cmds, commands(?MODULE),
             begin
-                application:start(?APP_NAME),
+                application:start(?APP),
                 {History,State,Result} = run_commands(?MODULE, Cmds),
-                application:stop(?APP_NAME),
+                application:stop(?APP),
                 ?WHENFAIL(
                     io:format("\n\nHistory: ~w\n\nState: ~w\n\nResult: ~w\n\n",
                     [History,State,Result]),

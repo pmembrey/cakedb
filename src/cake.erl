@@ -39,7 +39,12 @@ init(_) ->
 
     process_flag(trap_exit, true),
 
-    filelib:ensure_dir("data/"),
+
+
+    {ok,DataDir} = application:get_env(cake,data_dir),
+    filelib:ensure_dir(DataDir),
+
+
 
     application:start(folsom),
     application:start(cowboy),

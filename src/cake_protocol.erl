@@ -11,6 +11,7 @@
 -define(QUERY,3).
 -define(ALL_SINCE,4).
 -define(REQUEST_STREAM,5).
+-define(LAST_ENTRY_AT,6).
 
 
 start_link(ListenerPid, Socket, Transport, Opts) ->
@@ -60,16 +61,15 @@ loop(Socket, Transport) ->
 							loop(Socket,Transport)
 					end;
 
-				% Needs to be reimplemented...
-				%?QUERY ->
-				%	lager:info("Query request!"),
-				%	<<StreamID:16/big-integer,From:64/big-integer,To:64/big-integer>> = Message,
-				%	lager:info("StreamID: ~p~nFrom: ~p~nTo:   ~p~n",[StreamID,From,To]),
-				%	Data = cake_query:simple_query(StreamID,From,To),
-				%	DataLength = byte_size(Data),
-				%	Transport:send(Socket,<<DataLength:32/big-integer>>),
-				%	Transport:send(Socket,Data),
-				%	loop(Socket,Transport);
+				?QUERY ->
+					lager:info("Query request!"),
+					<<StreamID:16/big-integer,From:64/big-integer,To:64/big-integer>> = Message,
+					lager:info("StreamID: ~p~nFrom: ~p~nTo:   ~p~n",[StreamID,From,To]),
+					Data = cake_query:simple_query(StreamID,From,To),
+					DataLength = byte_size(Data),
+					Transport:send(Socket,<<DataLength:32/big-integer>>),
+					Transport:send(Socket,Data),
+					loop(Socket,Transport);
 
 
 				?ALL_SINCE ->
@@ -89,6 +89,16 @@ loop(Socket, Transport) ->
 					lager:debug("StreamName: ~p~n",[StreamName]),
 					StreamID = cake_stream_manager:register_stream(StreamName),
 					Transport:send(Socket,<<StreamID:16/big-integer>>),
+					loop(Socket,Transport);
+
+				?LAST_ENTRY_AT ->
+					lager:debug("Last Entry request!"),
+					<<StreamID:16/big-integer,At:64/big-integer>> = Message,
+					lager:debug("StreamID: ~p~nFrom: ~p~n",[StreamID,At]),
+					Data = cake_query:retrieve_last_entry_at(StreamID,At),
+					DataLength = byte_size(Data),
+					Transport:send(Socket,<<DataLength:32/big-integer>>),
+					Transport:send(Socket,Data),
 					loop(Socket,Transport);
 
 

@@ -34,6 +34,7 @@ public class Driver {
 	private static final int DB_QUERY = 3;
 	private static final int DB_ALL_SINCE = 4;
 	private static final int DB_REQUEST_STREAM = 5;
+	private static final int DB_LAST_ENTRY_AT = 6;
 
 	private static final int SIZE_SHORT = Short.SIZE/8;
 	private static final int SIZE_INT = Integer.SIZE/8;
@@ -136,7 +137,6 @@ public class Driver {
 		
 		// Get the incoming stream length
 		int length = inFromServer.readInt();	
-		System.out.println("Length: " + length + "\n");
 				
 		//create a buffer & read in rest of stream
 		byte[] buf = new byte[length];
@@ -166,7 +166,6 @@ public class Driver {
 			list.add(event);			
 		}
 		
-		System.out.println("Total count: " + list.size());
 		return(list);
 	}
 	
@@ -190,13 +189,44 @@ public class Driver {
 
 		// Get the incoming stream length
 		int length = inFromServer.readInt();	
-		System.out.println("Length: " + length + "\n");
+		
 				
 		//create a buffer & read in rest of stream
 		byte[] buf = new byte[length];
 		inFromServer.readFully(buf);
 		
 		return extractData(buf);
+
+	}
+
+
+		/**
+	 * Return last event as of this time
+	 * @param streamName
+	 * @param at In UNIX epoch format e.g. that returned by Date().getTime();
+	 * @return
+	 * @throws IOException
+	 */
+	public synchronized Event lastEntryAt(String streamName,long at) throws IOException {
+		
+		short streamID = getStreamID(streamName);			// Get Stream ID
+		short op = DB_LAST_ENTRY_AT;								
+
+		//send query
+		writeHeader(SIZE_SHORT + SIZE_LONG, op);
+		outToServer.writeShort(streamID);
+		outToServer.writeLong(at);
+		outToServer.flush();
+
+		// Get the incoming stream length
+		int length = inFromServer.readInt();	
+		
+				
+		//create a buffer & read in rest of stream
+		byte[] buf = new byte[length];
+		inFromServer.readFully(buf);
+		
+		return extractData(buf).get(0);
 
 	}
 

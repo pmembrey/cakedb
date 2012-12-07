@@ -82,7 +82,7 @@ handle_call({filename,StreamID},_From,State) ->
     case proplists:is_defined(StreamID,State#state.streams) of
         true ->
             {_Stream,FileName} = proplists:get_value(StreamID,State#state.streams),
-            {reply,FileName,State};
+            {reply,{ok,FileName},State};
         false ->
             {reply,unregistered_stream,State}
     end;

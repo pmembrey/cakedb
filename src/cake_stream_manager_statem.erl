@@ -107,8 +107,11 @@ streamid(#state{counter = Counter}) ->
 %%-----------------------------------------------------------------------------
 
 cleanup(StreamName) ->
-    DirName = "data/cakedb_data/"++StreamName++"/",
-    file:delete(DirName++StreamName++".index"),
-    file:delete(DirName++StreamName++".data"),
-    file:del_dir(DirName),
+    case application:get_env(cake,data_dir) of 
+        {ok,DataDir} -> DirName = DataDir++StreamName++"/",
+                        file:delete(DirName++StreamName++".index"),
+                        file:delete(DirName++StreamName++".data"),
+                        file:del_dir(DirName);
+        undefined ->    lager:warning("Couldn't delete CakeDB data directory: Couldn't find CakeDB data directory from config file...")
+    end,
     ok.

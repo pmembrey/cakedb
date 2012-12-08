@@ -7,11 +7,11 @@ CakeDB - Now you really can have your cake and eat it!
 
 In order to do so you will need to first build a release of CakeDB with:
 
-`rebar generate'
+`rebar generate`
 
 You can then start a consle in the new release with:
 
-`rel/cake/bin/cake console_clean'
+`rel/cake/bin/cake console_clean`
 
 Once the console is ready you can run the tests with:
 

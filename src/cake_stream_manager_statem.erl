@@ -107,7 +107,7 @@ streamid(#state{counter = Counter}) ->
 %%-----------------------------------------------------------------------------
 
 cleanup(StreamName) ->
-    DirName = "data/cakedb_data"++StreamName++"/",
+    DirName = "data/cakedb_data/"++StreamName++"/",
     file:delete(DirName++StreamName++".index"),
     file:delete(DirName++StreamName++".data"),
     file:del_dir(DirName),

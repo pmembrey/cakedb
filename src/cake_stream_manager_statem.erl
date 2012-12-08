@@ -18,16 +18,21 @@
 %% Statem callbacks
 %%-----------------------------------------------------------------------------
 
+% initialize the state machine
 initial_state() ->
     #state{streams = [], counter = 0}.
 
+% define the commands to test
 command(S) ->
     oneof([{call, ?SERVER, register_stream, [streamname()]},
            {call, ?SERVER, stream_filename, [streamid(S)]}]).
 
+% define when a command is valid
 precondition(_S, _command) ->
     true. % All preconditions are valid
 
+% define the state transitions triggered
+% by each command
 next_state(S, _V, {call, ?SERVER, register_stream, [Stream]}) ->
     case proplists:is_defined(Stream, S#state.streams) of
         true ->
@@ -47,6 +52,8 @@ next_state(S, _V, {call, ?SERVER, register_stream, [Stream]}) ->
 next_state(S, _V, {call, ?SERVER, stream_filename, [_StreamID]}) ->
     S.
 
+% define the conditions needed to be
+% met in order for a test to pass
 postcondition(S, {call, ?SERVER, register_stream, [StreamName]}, Result) ->
     case proplists:is_defined(StreamName,S#state.streams) of
         true ->
@@ -76,6 +83,7 @@ prop_cake_stream_manager_works() ->
                 application:start(?APP),
                 {History,State,Result} = run_commands(?MODULE, Cmds),
                 application:stop(?APP),
+                [cleanup(X) || {_,{_,X}} <- element(2,State)],
                 ?WHENFAIL(
                     io:format("\n\nHistory: ~w\n\nState: ~w\n\nResult: ~w\n\n",
                     [History,State,Result]),
@@ -94,3 +102,13 @@ streamid(#state{counter = Counter}) ->
     % between zero and twice the counter plus one.
     elements(lists:seq(0, 2*Counter+1)).
 
+%%-----------------------------------------------------------------------------
+%% utils
+%%-----------------------------------------------------------------------------
+
+cleanup(StreamName) ->
+    DirName = "data/cakedb_data"++StreamName++"/",
+    file:delete(DirName++StreamName++".index"),
+    file:delete(DirName++StreamName++".data"),
+    file:del_dir(DirName),
+    ok.

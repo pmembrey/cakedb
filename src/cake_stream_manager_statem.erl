@@ -10,7 +10,7 @@
 -record(state,{streams,counter}).
 
 -define(SERVER, cake_stream_manager).
--define(APP, cake_app).
+-define(APP, cake).
 -define(STREAMNAMES, [<<"tempfile">>, <<"file001">>, <<"anotherfile">>,
         <<"somefile">>, <<"binfile">>, <<"cakestream">>]).
 
@@ -18,16 +18,21 @@
 %% Statem callbacks
 %%-----------------------------------------------------------------------------
 
+% initialize the state machine
 initial_state() ->
     #state{streams = [], counter = 0}.
 
+% define the commands to test
 command(S) ->
     oneof([{call, ?SERVER, register_stream, [streamname()]},
            {call, ?SERVER, stream_filename, [streamid(S)]}]).
 
+% define when a command is valid
 precondition(_S, _command) ->
     true. % All preconditions are valid
 
+% define the state transitions triggered
+% by each command
 next_state(S, _V, {call, ?SERVER, register_stream, [Stream]}) ->
     case proplists:is_defined(Stream, S#state.streams) of
         true ->
@@ -47,6 +52,8 @@ next_state(S, _V, {call, ?SERVER, register_stream, [Stream]}) ->
 next_state(S, _V, {call, ?SERVER, stream_filename, [_StreamID]}) ->
     S.
 
+% define the conditions needed to be
+% met in order for a test to pass
 postcondition(S, {call, ?SERVER, register_stream, [StreamName]}, Result) ->
     case proplists:is_defined(StreamName,S#state.streams) of
         true ->
@@ -61,9 +68,7 @@ postcondition(S, {call, ?SERVER, stream_filename, [StreamID]}, Result) ->
         true ->
             {_StreamName,FileName} =
                 proplists:get_value(StreamID,S#state.streams),
-            io:format("FileName: ~p\n",[FileName]),
-            io:format("Result: ~p\n\n",[Result]),
-            Result =:= FileName;
+            Result =:= {ok,FileName};
         false ->
             Result =:= unregistered_stream
     end.
@@ -75,9 +80,10 @@ postcondition(S, {call, ?SERVER, stream_filename, [StreamID]}, Result) ->
 prop_cake_stream_manager_works() ->
     ?FORALL(Cmds, commands(?MODULE),
             begin
-                {ok, Pid} = ?APP:start([],[]),
+                application:start(?APP),
                 {History,State,Result} = run_commands(?MODULE, Cmds),
-                ?APP:stop([]),
+                application:stop(?APP),
+                [cleanup(X) || {_,{_,X}} <- element(2,State)],
                 ?WHENFAIL(
                     io:format("\n\nHistory: ~w\n\nState: ~w\n\nResult: ~w\n\n",
                     [History,State,Result]),
@@ -96,3 +102,16 @@ streamid(#state{counter = Counter}) ->
     % between zero and twice the counter plus one.
     elements(lists:seq(0, 2*Counter+1)).
 
+%%-----------------------------------------------------------------------------
+%% utils
+%%-----------------------------------------------------------------------------
+
+cleanup(StreamName) ->
+    case application:get_env(cake,data_dir) of 
+        {ok,DataDir} -> DirName = DataDir++StreamName++"/",
+                        file:delete(DirName++StreamName++".index"),
+                        file:delete(DirName++StreamName++".data"),
+                        file:del_dir(DirName);
+        undefined ->    lager:warning("Couldn't delete CakeDB data directory: Couldn't find CakeDB data directory from config file...")
+    end,
+    ok.

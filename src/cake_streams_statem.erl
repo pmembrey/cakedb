@@ -1,4 +1,4 @@
--module(cake_stream_manager_statem).
+-module(cake_streams_statem).
 
 -behaviour(proper_statem).
 
@@ -24,10 +24,16 @@ initial_state() ->
 
 % define the commands to test
 command(S) ->
-    oneof([{call, ?SERVER, register_stream, [streamname()]},
-           {call, ?SERVER, stream_filename, [streamid(S)]}]).
+    oneof([
+           {call, ?SERVER, register_stream, [streamname()]},
+           {call, ?SERVER, stream_filename, [streamid(S)]},
+           {call, gproc, send, [{n,l,{stream,streamid(S)}},binary()]},
+           {call, gproc, send, [{n,l,{stream,streamid(S)}},clear]}
+          ]).
 
 % define when a command is valid
+precondition(S, {call,gproc,send, [{n,l,{stream,StreamID}},_Msg]}) ->
+    proplists:is_defined(StreamID, S#state.streams);
 precondition(_S, _command) ->
     true. % All preconditions are valid
 
@@ -49,7 +55,8 @@ next_state(S, _V, {call, ?SERVER, register_stream, [Stream]}) ->
                         ]
                     |S#state.streams])}
     end;
-next_state(S, _V, {call, ?SERVER, stream_filename, [_StreamID]}) ->
+% All the other commands do not change the abstract state
+next_state(S, _V, _Command) ->
     S.
 
 % define the conditions needed to be
@@ -71,13 +78,15 @@ postcondition(S, {call, ?SERVER, stream_filename, [StreamID]}, Result) ->
             Result =:= {ok,FileName};
         false ->
             Result =:= unregistered_stream
-    end.
+    end;
+postcondition(_S, {call, gproc, send, [{n,l,{stream,_StreamID}}, Msg]}, Result) ->
+    Result =:= Msg.
 
 %%-----------------------------------------------------------------------------
 %% Properties
 %%-----------------------------------------------------------------------------
 
-prop_cake_stream_manager_works() ->
+prop_cake_streams_work() ->
     ?FORALL(Cmds, commands(?MODULE),
             begin
                 application:start(?APP),

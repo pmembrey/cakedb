@@ -23,7 +23,7 @@
 
 
 
--export([init/3,writer_init/3,timestamp_as_native_binary/0]).
+-export([init/3,writer_init/3,timestamp_as_native_binary/0,verify_file/1]).
 
 init(Stream,StreamID,SliceName) ->
 
@@ -166,6 +166,33 @@ timestamp_as_native_binary() ->
         {Mega, Sec, Micro} = now(),
         TS = Mega * 1000000 * 1000000 + Sec * 1000000 + Micro,
         <<TS:64/native-integer>>.
+
+
+
+%%%
+%%% Experimental start to file recovery...
+%%%
+
+verify_file(FileName) ->
+    {ok,DataFile} = file:open(FileName,[write,read,binary,raw]),
+    {ok,Offset} = file:position(DataFile,{eof,-3}),
+
+    case file:read(DataFile,3) of
+    	{ok,<<3,3,3>>} -> lager:info("~p is okay",[FileName]);
+    	Data           -> lager:warning("~p is corrupt: ~p",[FileName,Data]),
+    					  fix_file(DataFile,Offset,FileName)
+
+    end,
+    file:close(DataFile).
+
+
+fix_file(DataFile,Offset,FileName) ->
+	{ok,NewOffset} = file:position(DataFile,{cur,-4}),
+	 case file:read(DataFile,3) of
+    	{ok,<<3,3,3>>} -> lager:info("Last message found at ~p in ~p, truncating file...",[Offset,FileName]),
+    					  file:truncate(DataFile);
+    	Data           -> fix_file(DataFile,NewOffset,FileName)
+    end.
 
 
 

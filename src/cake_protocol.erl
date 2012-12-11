@@ -44,9 +44,11 @@ loop(Socket, Transport) ->
 					lager:debug("Client wants a stream!"),
 					<<_StreamLength:16/big-integer,StreamName/binary>> = Message,
 					lager:debug("StreamName: ~p~n",[StreamName]),
-					StreamID = cake_stream_manager:register_stream(StreamName),
-					Transport:send(Socket,<<StreamID:16/big-integer>>),
-					loop(Socket,Transport);
+					case cake_stream_manager:register_stream(StreamName) of
+						badstream -> ok = Transport:close(Socket);
+						StreamID  -> Transport:send(Socket,<<StreamID:16/big-integer>>),
+									 loop(Socket,Transport)
+					end;
 
 
 				?APPEND ->
@@ -87,9 +89,11 @@ loop(Socket, Transport) ->
 					lager:debug("Client wants a stream!"),
 					<<StreamName/binary>> = Message,
 					lager:debug("StreamName: ~p~n",[StreamName]),
-					StreamID = cake_stream_manager:register_stream(StreamName),
-					Transport:send(Socket,<<StreamID:16/big-integer>>),
-					loop(Socket,Transport);
+					case cake_stream_manager:register_stream(StreamName) of
+						badstream -> ok = Transport:close(Socket);
+						StreamID  -> Transport:send(Socket,<<StreamID:16/big-integer>>),
+									 loop(Socket,Transport)
+					end;
 
 				?LAST_ENTRY_AT ->
 					lager:debug("Last Entry request!"),

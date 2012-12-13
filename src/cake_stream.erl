@@ -41,15 +41,15 @@ init(Stream,StreamID,SliceName) ->
 
 
 	gproc:add_local_name({stream,StreamID}),
-	loop(Writer,[],true,0,0).
+	loop(Writer,[],true,0,0,Stream).
 
-loop(Writer,DataList,ClearToSend,LastTS,Count) ->
+loop(Writer,DataList,ClearToSend,LastTS,Count,StreamName) ->
 	receive
 		Message ->
 			case Message of 
 				clear ->
 					lager:debug("Got 'clear' message on ~p",[self()]),
-					loop(Writer,DataList,true,LastTS,Count);
+					loop(Writer,DataList,true,LastTS,Count,StreamName);
 
 				Data ->
 
@@ -64,17 +64,17 @@ loop(Writer,DataList,ClearToSend,LastTS,Count) ->
 						true ->
 							lager:debug("Got data and we're clear to send!"),
 							Writer ! {Count,TS,lists:reverse(NewDataList)},
-							loop(Writer,[],false,TS,0);
+							loop(Writer,[],false,TS,0,StreamName);
 						false ->
-						    case Count > 1000 of
+						    case Count > 50000 of
                             	true ->
-                                	lager:warning("~p has more than 1,000 messages pending - sending message by force!",[self()]),
+                                	lager:warning("~p(~p) has more than 50,000 messages pending - sending message by force!",[StreamName,self()]),
                                     Writer ! {Count,TS,lists:reverse(NewDataList)},
-                                    loop(Writer,[],false,TS,0);
+                                    loop(Writer,[],false,TS,0,StreamName);
                                 false -> ok
                             end,
 							lager:debug("Got data but not clear to send!"),
-							loop(Writer,NewDataList,false,TS,Count+1)
+							loop(Writer,NewDataList,false,TS,Count+1,StreamName)
 					end
 			end
 	after 5000 ->
@@ -86,13 +86,13 @@ loop(Writer,DataList,ClearToSend,LastTS,Count) ->
 					true ->
 						lager:debug("Clear to send but no new data in the last 5 seconds - sending what we have..."),
 						Writer ! {Count,LastTS,lists:reverse(DataList)},
-						loop(Writer,[],false,LastTS,0);
+						loop(Writer,[],false,LastTS,0,StreamName);
 					false ->
 						lager:debug("Clear to send but no data..."),
-						loop(Writer,[],true,LastTS,Count)
+						loop(Writer,[],true,LastTS,Count,StreamName)
 				end;
 			false ->
-				loop(Writer,DataList,false,LastTS,Count)
+				loop(Writer,DataList,false,LastTS,Count,StreamName)
 		end	
 	end.
 

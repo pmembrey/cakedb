@@ -35,7 +35,7 @@ command(S) ->
 precondition(S, {call,gproc,send, [{n,l,{stream,StreamID}},_Msg]}) ->
     proplists:is_defined(StreamID, S#state.streams);
 precondition(_S, _command) ->
-    true. % All preconditions are valid
+    true.
 
 % define the state transitions triggered
 % by each command

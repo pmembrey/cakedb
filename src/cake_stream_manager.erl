@@ -8,7 +8,7 @@
 	     code_change/3,handle_cast/2,
 	     stop/0]).
 
--export([register_stream/1,stream_filename/1]).
+-export([register_stream/1,stream_filename/1,valid_stream_name/1]).
 
 -record(state,{streams,counter}).
 
@@ -64,18 +64,24 @@ handle_cast(stop,State) ->
 handle_call({register,Stream},_From,State) ->	
 
     lager:debug("Stream state data: ~p",[(State#state.streams)]),
-	case proplists:is_defined(Stream,State#state.streams) of
-		true ->
-			{StreamID,_FileName} = proplists:get_value(Stream,State#state.streams),
-			{reply,StreamID,State};
-		false ->
-			StreamID = State#state.counter + 1,
-			lager:info("Allocating ID ~p to stream ~p",[StreamID,Stream]),
-            FileName = binary_to_list(Stream),
-			spawn_link(cake_stream,init,[Stream,StreamID,FileName]),
-			gproc:await({n,l,{stream,StreamID}}),
-			{reply,StreamID,State#state{counter=StreamID,streams=   lists:flatten([[{Stream,{StreamID,FileName}},{StreamID,{Stream,FileName}}]|State#state.streams] )}}
-	end;
+
+    case valid_stream_name(Stream) of
+        ok ->
+	       case proplists:is_defined(Stream,State#state.streams) of
+		      true ->
+			     {StreamID,_FileName} = proplists:get_value(Stream,State#state.streams),
+			     {reply,StreamID,State};
+		      false ->
+			     StreamID = State#state.counter + 1,
+			     lager:info("Allocating ID ~p to stream ~p",[StreamID,Stream]),
+                 FileName = binary_to_list(Stream),
+			     spawn_link(cake_stream,init,[Stream,StreamID,FileName]),
+			     gproc:await({n,l,{stream,StreamID}}),
+			     {reply,StreamID,State#state{counter=StreamID,streams=   lists:flatten([[{Stream,{StreamID,FileName}},{StreamID,{Stream,FileName}}]|State#state.streams] )}}
+	        end;
+        notok -> lager:warning("Attempt to use an invalid stream name detected."),
+                 {reply,badstream,State}
+    end;
 
 handle_call({filename,StreamID},_From,State) ->
     lager:debug("StreamID as passed to filename looker upper: ~p",[StreamID]),
@@ -106,4 +112,12 @@ code_change(_OldVsn, State, _Extra) ->
 
 stop() ->
 	gen_server:cast(cake_stream_manager,stop).
+
+
+
+valid_stream_name(StreamName) ->
+    case re:run(StreamName,"\\A[a-zA-Z0-9\\-_]+\\z") of
+        {match,_}  -> ok;
+        _          -> notok
+    end.
 

@@ -54,37 +54,88 @@ initial_state() ->
 
 % define the commands to test
 command(S) ->
-    T0 = S#state.starttime,
-    T1 = timestamp(),
     oneof([
         {call,?MODULE,request_stream_with_size,[pos_integer(),streamname()]},
         {call,?MODULE,append,[streamid(S),list(integer(32,255))]},
-        {call,?MODULE,simple_query,[streamid(S),uniform(T0,T1),uniform(T0,T1)]},
-        {call,?MODULE,all_since,[streamid(S),uniform(T0,T1)]},
+        {call,?MODULE,simple_query,[streamid(S),S#state.starttime-10000,timestamp()+10000]},
+        {call,?MODULE,all_since,[streamid(S),S#state.starttime]},
         {call,?MODULE,request_stream,[streamname()]},
-        {call,?MODULE,last_entry_at,[streamid(S),uniform(T0,T1)]}
+        {call,?MODULE,last_entry_at,[streamid(S),timestamp()]}
     ]).
 
 % define when a command is valid
 precondition(_S, _Command) ->
     true. % all preconditions are valid
 
-%% define the state transitions triggered
-%% by each command
-%next_state(S,{ok,<<_,ID>>},{call,?MODULE,request_stream_with_size,[_Size,StreamName]}) ->
-%    S#state{
-%        streams = [{ID, StreamName, []}|S#state.streams]
-%    };
-%next_state(S,{ok,<<_,ID>>},{call,?MODULE,request_stream,[StreamName]}) ->
-%    S#state{
-%        streams = [{ID, StreamName, []}|S#state.streams]
-%    };
-%% all the other commands do not change the abstract state
+% define the state transitions triggered
+% by each command
+next_state(S,{ok,<<_,ID>>},{call,?MODULE,request_stream_with_size,[_Size,StreamName]}) ->
+    case lists:keymember(StreamName,2,S#state.streams) of
+        false ->
+            S#state{
+                streams = [{ID, StreamName, []}|S#state.streams]
+            };
+        true ->
+            S
+    end;
+next_state(S,_V,{call,?MODULE,append,[StreamID,Data]}) ->
+    OldTuple = lists:keysearch(StreamID,1,S#state.streams),
+    case OldTuple of
+        {value, {StreamID,StreamName,OldData}} ->
+            NewTuple = {StreamID,StreamName,[{timestamp(),Data}|OldData]},
+            S#state{
+                streams = lists:keyreplace(StreamID,1,S#state.streams,NewTuple)
+            };
+        false ->
+            S
+    end;
+next_state(S,{ok,<<_,ID>>},{call,?MODULE,request_stream,[StreamName]}) ->
+    case lists:keymember(StreamName,2,S#state.streams) of
+        false ->
+            S#state{
+                streams = [{ID, StreamName, []}|S#state.streams]
+            };
+        true ->
+            S
+    end;% all the other commands do not change the abstract state
 next_state(S, _V, _Command) ->
     S.
 
 % define the conditions needed to be
 % met in order for a test to pass
+postcondition(S, {call,?MODULE,request_stream_with_size,[_Size,StreamName]}, Result) ->
+    Stream = lists:keysearch(StreamName,2,S#state.streams),
+    case {Stream,Result} of
+        {{value,{StreamID,_StreamName,_Data}},{ok,<<0,ID>>}} ->
+            StreamID =:= ID;
+        {false,{ok,_ID}} ->
+            true;
+        _ ->
+            false
+    end;
+postcondition(S, {call,?MODULE,append,[StreamID,_Data]}, Result) ->
+    case lists:keymember(StreamID,1,S#state.streams) of
+        true ->
+            Result =:= {error,timeout};
+        false ->
+            Result =:= {error,closed}
+    end;
+postcondition(S, {call,?MODULE,simple_query,[StreamID,Start,End]}, Result) ->
+    Stream = lists:keysearch(StreamID,1,S#state.streams),
+    io:format("~nStream: ~p~n",[Stream]),
+    io:format("Start: ~p, End: ~p~n",[Start,End]),
+    io:format("Result: ~p~n~n",[Result]),
+    true;
+postcondition(S, {call,?MODULE,request_stream,[_Size,StreamName]}, Result) ->
+    Stream = lists:keysearch(StreamName,2,S#state.streams),
+    case {Stream,Result} of
+        {{value,{StreamID,_StreamName,_Data}},{ok,<<0,ID>>}} ->
+            StreamID =:= ID;
+        {false,{ok,_ID}} ->
+            true;
+        _ ->
+            false
+    end;
 postcondition(_S, _Command, _Result) ->
     true.
 
@@ -119,15 +170,6 @@ streamid(#state{streams = []}) ->
 streamid(#state{streams = Streams}) ->
     IDs = [X || {X,_,_} <- Streams],
     elements([lists:max(IDs)+1|IDs]).
-
-uniform(A,B) ->
-    % Returns random integer in range [A,B]
-    case A=:=B of
-        true ->
-            A;
-        false ->
-            A + random:uniform(B-A)
-    end.
 
 %%-----------------------------------------------------------------------------
 %% query operations
@@ -167,7 +209,6 @@ tcp_query(Host,Port,Packet) ->
     gen_tcp:send(Socket, Packet),
     Output = gen_tcp:recv(Socket,0,500),
     gen_tcp:close(Socket),
-    io:format("~nOutput: ~p~n~n",[Output]),
     Output.
 
 packet(Option,Message) ->

@@ -5,7 +5,7 @@
 -include_lib("proper/include/proper.hrl").
 
 -export([initial_state/0, command/1, precondition/2, postcondition/3,
-        next_state/3]).
+        next_state/3, cleanup/1]).
 
 -record(state,{streams,counter}).
 

@@ -11,7 +11,7 @@
 
 % E.g. of model state structure:
 % {
-%   starttime = 1355417136196,
+%   starttime = 13554171361963445,
 %   streams = [
 %     {StreamID_1, StreamName_1, [{TS_1,<<"DATA_1">>}, ..., {TS_M,<<"DATA_M">>}]},
 %     ...,
@@ -57,7 +57,8 @@ command(S) ->
     oneof([
         {call,?MODULE,request_stream_with_size,[pos_integer(),streamname()]},
         {call,?MODULE,append,[streamid(S),list(integer(32,255))]},
-        {call,?MODULE,simple_query,[streamid(S),S#state.starttime-10000,timestamp()+10000]},
+%        {call,?MODULE,simple_query,[streamid(S),S#state.starttime-1000000000,timestamp()]},
+        {call,?MODULE,simple_query,[streamid(S),S#state.starttime,timestamp()]},
         {call,?MODULE,all_since,[streamid(S),S#state.starttime]},
         {call,?MODULE,request_stream,[streamname()]},
         {call,?MODULE,last_entry_at,[streamid(S),timestamp()]}
@@ -149,7 +150,7 @@ prop_cake_protocol_works() ->
             application:start(cake),
             {History,State,Result} = run_commands(?MODULE, Cmds),
             application:stop(cake),
-            [cake_streams_statem:cleanup(X) || {_,X,_} <- element(3,State)],
+%            [cake_streams_statem:cleanup(X) || {_,X,_} <- element(3,State)],
             ?WHENFAIL(
                 io:format("\n\nHistory: ~w\n\nState: ~w\n\nResult: ~w\n\n",
                 [History,State,Result]),
@@ -184,11 +185,13 @@ append(StreamID,String) ->
     tcp_query(?HOST,?PORT,packet(?APPEND,Message)).
 
 simple_query(StreamID,Start,End) ->
-    Message = list_to_binary([ <<StreamID:16>>, <<Start:64>>, <<End:64>>]),
+%    Message = list_to_binary([ <<StreamID:16>>, <<Start:64>>, <<End:64>>]),
+    Message = list_to_binary([ <<StreamID:16>>, Start, End]),
     tcp_query(?HOST,?PORT,packet(?QUERY,Message)).
 
 all_since(StreamID,Time) ->
-    Message = list_to_binary([ <<StreamID:16>>, <<Time:64>>]),
+    Message = list_to_binary([ <<StreamID:16>>, Time]),
+%    Message = list_to_binary([ <<StreamID:16>>, <<Time:64>>]),
     tcp_query(?HOST,?PORT,packet(?ALL_SINCE,Message)).
 
 request_stream(StreamName) ->
@@ -196,7 +199,8 @@ request_stream(StreamName) ->
     tcp_query(?HOST,?PORT,packet(?REQUEST_STREAM,Message)).
  
 last_entry_at(StreamID,Time) ->
-    Message = list_to_binary([ <<StreamID:16>>, <<Time:64>>]),
+    Message = list_to_binary([ <<StreamID:16>>, Time]),
+%    Message = list_to_binary([ <<StreamID:16>>, <<Time:64>>]),
     tcp_query(?HOST,?PORT,packet(?LAST_ENTRY_AT,Message)).
 
 %%-----------------------------------------------------------------------------
@@ -218,9 +222,14 @@ packet(Option,Message) ->
     list_to_binary([Length, <<Option:16>>,Message]).
 
 timestamp() ->
-    % Returns time in milliseconds since epoch
-    {MegaSecs,Secs,MicroSecs} = now(),
-    1000000000*MegaSecs + 1000*Secs + MicroSecs div 1000.
+        {Mega, Sec, Micro} = now(),
+        TS = Mega * 1000000 * 1000000 + Sec * 1000000 + Micro,
+        <<TS:64/native-integer>>.
+
+%timestamp() ->
+%    % Returns time in microseconds since epoch
+%    {MegaSecs,Secs,MicroSecs} = now(),
+%    1000000000000*MegaSecs + 1000000*Secs + MicroSecs.
 
 int_to_binary(Int, Bits) ->
     <<Int:Bits>>.

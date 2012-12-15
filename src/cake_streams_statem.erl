@@ -106,10 +106,10 @@ prop_cake_streams_work() ->
 streamname() -> 
     elements(?STREAMNAMES).
 
+% Return any of the existing StreamID
+% plus an unassgined one for testing
 streamid(#state{counter = Counter}) ->
-    % for testing purpose, return any integer
-    % between zero and twice the counter plus one.
-    elements(lists:seq(0, 2*Counter+1)).
+    elements(lists:seq(1, Counter+1)).
 
 %%-----------------------------------------------------------------------------
 %% utils

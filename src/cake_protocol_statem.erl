@@ -12,13 +12,14 @@
 % E.g. of model state structure:
 % {
 %   starttime = 13554171361963445,
+%   counter = N,
 %   streams = [
 %     {StreamID_1, StreamName_1, [{TS_1,<<"DATA_1">>}, ..., {TS_M,<<"DATA_M">>}]},
 %     ...,
 %     {StreamID_N, StreamName_N, [{TS_1,<<"DATA_1">>}, ..., {TS_L,<<"DATA_L">>}]}
 %   ]
 % }
--record(state,{starttime,streams}).
+-record(state,{starttime,counter,streams}).
 
 % Options
 -define(NOOP, 0).
@@ -28,11 +29,6 @@
 -define(ALL_SINCE, 4).
 -define(REQUEST_STREAM, 5).
 -define(LAST_ENTRY_AT, 6).
-
-% Buffer zone of difference in ms between a
-% timestamp in the model state and a timestamp
-% in the database
--define(ERROR_MARGIN, 100).
 
 % socket
 -define(HOST,"localhost").
@@ -49,6 +45,7 @@
 initial_state() ->
     #state{
             starttime = timestamp(),
+            counter = 0,
             streams = []
           }.
 
@@ -56,50 +53,46 @@ initial_state() ->
 command(S) ->
     oneof([
         {call,?MODULE,request_stream,[streamname()]},
-%        {call,?MODULE,request_stream_with_size,[pos_integer(),streamname()]},
+        {call,?MODULE,request_stream_with_size,[pos_integer(),streamname()]},
 %        {call,?MODULE,append,[streamid(S),list(integer(32,255))]},
-        {call,?MODULE,simple_query,[streamid(S),S#state.starttime,timestamp_wrapper()]}%,
-%        {call,?MODULE,all_since,[streamid(S),S#state.starttime]},
-%        {call,?MODULE,last_entry_at,[streamid(S),timestamp_wrapper()]}
+        {call,?MODULE,append,[streamid(S),"AAAAAA"]},
+        {call,?MODULE,simple_query,[streamid(S),S#state.starttime,timestamp_wrapper()]},
+        {call,?MODULE,all_since,[streamid(S),S#state.starttime]},
+        {call,?MODULE,last_entry_at,[streamid(S),timestamp_wrapper()]}
     ]).
 
 % define when a command is valid
-precondition(S, {call,?MODULE,simple_query,[StreamID,_Start,_End]}) ->
-%    Bool=lists:keymember(StreamID,1,S#state.streams),
-    io:format("~nS: ~p~n~n",[S]),
-%    io:format("StreamID: ~p~n",[StreamID]),
-%    io:format("~nStreams: ~p~n",[S#state.streams]),
-%    io:format("Bool: ~p~n~n",[Bool]),
-    lists:keymember(StreamID,1,S#state.streams);
 precondition(_S, _Command) ->
     true.
 
-%% define the state transitions triggered
-%% by each command
-%next_state(S,{ok,<<_,ID>>},{call,?MODULE,request_stream_with_size,[_Size,StreamName]}) ->
-%    case lists:keymember(StreamName,2,S#state.streams) of
-%        false ->
-%            S#state{
-%                streams = [{ID, StreamName, []}|S#state.streams]
-%            };
-%        true ->
-%            S
-%    end;
-%next_state(S,_V,{call,?MODULE,append,[StreamID,Data]}) ->
-%    OldTuple = lists:keysearch(StreamID,1,S#state.streams),
-%    case OldTuple of
-%        {value, {StreamID,StreamName,OldData}} ->
-%            NewTuple = {StreamID,StreamName,[{timestamp(),Data}|OldData]},
-%            S#state{
-%                streams = lists:keyreplace(StreamID,1,S#state.streams,NewTuple)
-%            };
-%        false ->
-%            S
-%    end;
+% define the state transitions triggered
+% by each command
+next_state(S,{ok,<<_,ID>>},{call,?MODULE,request_stream_with_size,[_Size,StreamName]}) ->
+    case lists:keymember(StreamName,2,S#state.streams) of
+        false ->
+            S#state{
+                counter = S#state.counter + 1,
+                streams = [{ID, StreamName, []}|S#state.streams]
+            };
+        true ->
+            S
+    end;
+next_state(S,_V,{call,?MODULE,append,[StreamID,Data]}) ->
+    OldTuple = lists:keysearch(StreamID,1,S#state.streams),
+    case OldTuple of
+        {value, {StreamID,StreamName,OldData}} ->
+            NewTuple = {StreamID,StreamName,[{timestamp(),Data}|OldData]},
+            S#state{
+                streams = lists:keyreplace(StreamID,1,S#state.streams,NewTuple)
+            };
+        false ->
+            S
+    end;
 next_state(S,{ok,<<_,ID>>},{call,?MODULE,request_stream,[StreamName]}) ->
     case lists:keymember(StreamName,2,S#state.streams) of
         false ->
             S#state{
+                counter = S#state.counter + 1,
                 streams = [{ID, StreamName, []}|S#state.streams]
             };
         true ->
@@ -109,41 +102,41 @@ next_state(S,{ok,<<_,ID>>},{call,?MODULE,request_stream,[StreamName]}) ->
 next_state(S, _V, _Command) ->
     S.
 
-%% define the conditions needed to be
-%% met in order for a test to pass
-%postcondition(S, {call,?MODULE,request_stream_with_size,[_Size,StreamName]}, Result) ->
-%    Stream = lists:keysearch(StreamName,2,S#state.streams),
-%    case {Stream,Result} of
-%        {{value,{StreamID,_StreamName,_Data}},{ok,<<0,ID>>}} ->
-%            StreamID =:= ID;
-%        {false,{ok,_ID}} ->
-%            true;
-%        _ ->
-%            false
-%    end;
-%postcondition(S, {call,?MODULE,append,[StreamID,_Data]}, Result) ->
-%    case lists:keymember(StreamID,1,S#state.streams) of
-%        true ->
-%            Result =:= {error,timeout};
-%        false ->
-%            Result =:= {error,closed}
-%    end;
-%postcondition(S, {call,?MODULE,simple_query,[StreamID,_Start,_End]}, Result) ->
-%    Stream = lists:keysearch(StreamID,1,S#state.streams),
-%    io:format("~nStream: ~p~n",[Stream]),
-%    io:format("Result: ~p~n~n",[Result]),
-%    true;
-%postcondition(S, {call,?MODULE,request_stream,[_Size,StreamName]}, Result) ->
-%    Stream = lists:keysearch(StreamName,2,S#state.streams),
-%    case {Stream,Result} of
-%        {{value,{StreamID,_StreamName,_Data}},{ok,<<0,ID>>}} ->
-%            StreamID =:= ID;
-%        {false,{ok,_ID}} ->
-%            true;
-%        _ ->
-%            false
-%    end;
-postcondition(S, _Command, _Result) ->
+% define the conditions needed to be
+% met in order for a test to pass
+postcondition(S, {call,?MODULE,request_stream_with_size,[_Size,StreamName]}, Result) ->
+    Stream = lists:keysearch(StreamName,2,S#state.streams),
+    case {Stream,Result} of
+        {{value,{StreamID,_StreamName,_Data}},{ok,<<0,ID>>}} ->
+            StreamID =:= ID;
+        {false,{ok,_ID}} ->
+            true;
+        _ ->
+            false
+    end;
+postcondition(S, {call,?MODULE,append,[StreamID,_Data]}, Result) ->
+    case lists:keymember(StreamID,1,S#state.streams) of
+        true ->
+            Result =:= {error,timeout};
+        false ->
+            Result =:= {error,closed}
+    end;
+postcondition(S, {call,?MODULE,simple_query,[StreamID,_Start,_End]}, Result) ->
+    Stream = lists:keysearch(StreamID,1,S#state.streams),
+    io:format("~nStream: ~p~n",[Stream]),
+    io:format("Result: ~p~n~n",[Result]),
+    true;
+postcondition(S, {call,?MODULE,request_stream,[_Size,StreamName]}, Result) ->
+    Stream = lists:keysearch(StreamName,2,S#state.streams),
+    case {Stream,Result} of
+        {{value,{StreamID,_StreamName,_Data}},{ok,<<0,ID>>}} ->
+            StreamID =:= ID;
+        {false,{ok,_ID}} ->
+            true;
+        _ ->
+            false
+    end;
+postcondition(_S, _Command, _Result) ->
     true.
 
 %%-----------------------------------------------------------------------------
@@ -156,7 +149,7 @@ prop_cake_protocol_works() ->
             application:start(cake),
             {History,State,Result} = run_commands(?MODULE, Cmds),
             application:stop(cake),
-            [cake_streams_statem:cleanup(X) || {_,X,_} <- element(3,State)],
+            [cake_streams_statem:cleanup(X) || {_,X,_} <- element(4,State)],
             ?WHENFAIL(
                 io:format("\n\nHistory: ~w\n\nState: ~w\n\nResult: ~w\n\n",
                 [History,State,Result]),
@@ -172,12 +165,8 @@ streamname() ->
 
 % Return any of the existing StreamID
 % plus an unassgined one for testing
-streamid(#state{streams = []}) ->
-%    1;
-    elements([1,2,3]);
-streamid(#state{streams = Streams}) ->
-    IDs = [X || {X,_,_} <- Streams],
-    elements([lists:max(IDs)+1|IDs]).
+streamid(#state{counter = Counter}) ->
+    elements(lists:seq(1, Counter+1)).
 
 %%-----------------------------------------------------------------------------
 %% query operations
@@ -192,7 +181,7 @@ append(StreamID,String) ->
     tcp_query(?HOST,?PORT,packet(?APPEND,Message)).
 
 simple_query(StreamID,Start,End) ->
-    timer:sleep(5000),
+    timer:sleep(10000),
     Message = list_to_binary([ <<StreamID:16>>, Start, End]),
     tcp_query(?HOST,?PORT,packet(?QUERY,Message)).
 
@@ -227,17 +216,12 @@ packet(Option,Message) ->
     list_to_binary([Length, <<Option:16>>,Message]).
 
 timestamp() ->
-        {Mega, Sec, Micro} = now(),
-        TS = Mega * 1000000 * 1000000 + Sec * 1000000 + Micro,
-        <<TS:64/big-integer>>.
+    {Mega, Sec, Micro} = now(),
+    TS = Mega * 1000000 * 1000000 + Sec * 1000000 + Micro,
+    <<TS:64/big-integer>>.
 
 timestamp_wrapper() ->
     {call,?MODULE,timestamp,[]}.
-
-%timestamp() ->
-%    % Returns time in microseconds since epoch
-%    {MegaSecs,Secs,MicroSecs} = now(),
-%    1000000000000*MegaSecs + 1000000*Secs + MicroSecs.
 
 int_to_binary(Int, Bits) ->
     <<Int:Bits>>.

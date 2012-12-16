@@ -33,6 +33,7 @@
 % socket
 -define(HOST,"localhost").
 -define(PORT,8888).
+-define(TIMEOUT,2000). % time delay in ms to let CakeDB flush
 
 -define(STREAMNAMES, ["tempfile", "file001", "anotherfile",
         "somefile", "binfile", "cakestream"]).
@@ -56,17 +57,19 @@ command(S) ->
         {call,?MODULE,request_stream_with_size,[pos_integer(),streamname()]},
 %        {call,?MODULE,append,[streamid(S),list(integer(32,255))]},
         {call,?MODULE,append,[streamid(S),"AAAAAA"]},
-        {call,?MODULE,simple_query,[streamid(S),S#state.starttime,timestamp_wrapper()]},
-        {call,?MODULE,all_since,[streamid(S),S#state.starttime]},
-        {call,?MODULE,last_entry_at,[streamid(S),timestamp_wrapper()]}
+        {call,?MODULE,simple_query,[streamid(S),S#state.starttime,timestamp_wrapper()]}%,
+%        {call,?MODULE,all_since,[streamid(S),S#state.starttime]},
+%        {call,?MODULE,last_entry_at,[streamid(S),timestamp_wrapper()]}
     ]).
 
 % define when a command is valid
+precondition(S, {call,?MODULE,simple_query,[StreamID,_Start,_End]}) ->
+    lists:keymember(StreamID,1,S#state.streams);
 precondition(_S, _Command) ->
     true.
 
-% define the state transitions triggered
-% by each command
+%% define the state transitions triggered
+%% by each command
 next_state(S,{ok,<<_,ID>>},{call,?MODULE,request_stream_with_size,[_Size,StreamName]}) ->
     case lists:keymember(StreamName,2,S#state.streams) of
         false ->
@@ -88,22 +91,22 @@ next_state(S,_V,{call,?MODULE,append,[StreamID,Data]}) ->
         false ->
             S
     end;
-next_state(S,{ok,<<_,ID>>},{call,?MODULE,request_stream,[StreamName]}) ->
+next_state(S,_V,{call,?MODULE,request_stream,[StreamName]}) ->
     case lists:keymember(StreamName,2,S#state.streams) of
         false ->
             S#state{
                 counter = S#state.counter + 1,
-                streams = [{ID, StreamName, []}|S#state.streams]
+                streams = [{S#state.counter +1, StreamName, []}|S#state.streams]
             };
         true ->
             S
     end;
-% all the other commands do not change the abstract state
+%% all the other commands do not change the abstract state
 next_state(S, _V, _Command) ->
     S.
 
-% define the conditions needed to be
-% met in order for a test to pass
+%% define the conditions needed to be
+%% met in order for a test to pass
 postcondition(S, {call,?MODULE,request_stream_with_size,[_Size,StreamName]}, Result) ->
     Stream = lists:keysearch(StreamName,2,S#state.streams),
     case {Stream,Result} of
@@ -164,7 +167,6 @@ streamname() ->
     elements(?STREAMNAMES).
 
 % Return any of the existing StreamID
-% plus an unassgined one for testing
 streamid(#state{counter = Counter}) ->
     elements(lists:seq(1, Counter+1)).
 
@@ -181,7 +183,7 @@ append(StreamID,String) ->
     tcp_query(?HOST,?PORT,packet(?APPEND,Message)).
 
 simple_query(StreamID,Start,End) ->
-    timer:sleep(10000),
+    timer:sleep(?TIMEOUT),
     Message = list_to_binary([ <<StreamID:16>>, Start, End]),
     tcp_query(?HOST,?PORT,packet(?QUERY,Message)).
 

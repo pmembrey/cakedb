@@ -1,7 +1,7 @@
 Gem::Specification.new do |s|
   s.name        = 'cakedb'
-  s.version     = '0.0.5'
-  s.date        = '2012-12-09'
+  s.version     = '0.0.14'
+  s.date        = '2012-12-18'
   s.summary     = "CakeDB Ruby Driver"
   s.description = "CakeDB Ruby Driver"
   s.authors     = ["David Hows"]

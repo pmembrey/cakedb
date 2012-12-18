@@ -3,18 +3,15 @@
 #require 'cakedb'
 require './lib/cakedb.rb'
 
-#@conn = Cake.new("localhost", 8888)
-@conn = CakeDB.new
-@conn.write("a","cheeseburger")
-@conn.write("a","chips")
-@conn.write("a","softdrink")
-@conn.write("a","nachos")
-@conn.write("a","sushi")
+@conn = CakeDB.new("localhost", 8888, 2)
+#@conn = CakeDB.new
+#@conn.write("a","cheeseburger"*1000*10)
+#@conn.write("a","chips")
+#@conn.write("a","softdrink")
+#@conn.write("a","nachos")
+#@conn.write("a","sushi")
 includedTime = 0
-
-puts "Sleeping to ensure data hits the disk..."
-sleep 10
-@conn.allSince("a", 0).each do |line|
+@conn.allSince("stream", 0).each do |line|
   puts line["ts"].to_s + "|" + line["data"]
 end
 

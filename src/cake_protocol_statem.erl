@@ -53,8 +53,8 @@ command(S) ->
         {call,?MODULE,request_stream,[proper_utils:streamname()]},
         {call,?MODULE,request_stream_with_size,[pos_integer(),proper_utils:streamname()]},
         {call,?MODULE,append,[proper_utils:streamid(S),list(integer(32,255))]},
-%        {call,?MODULE,simple_query,[proper_utils:streamid(S),S#state.starttime,timestamp_wrapper()]},
-%        {call,?MODULE,all_since,[proper_utils:streamid(S),S#state.starttime]},
+        {call,?MODULE,simple_query,[proper_utils:streamid(S),S#state.starttime,timestamp_wrapper()]},
+        {call,?MODULE,all_since,[proper_utils:streamid(S),S#state.starttime]},
         {call,?MODULE,last_entry_at,[proper_utils:streamid(S),timestamp_wrapper()]}
     ]).
 
@@ -77,12 +77,12 @@ precondition(_S, _Command) ->
 
 % define the state transitions triggered
 % by each command
-next_state(S,{ok,<<_,ID>>},{call,?MODULE,request_stream_with_size,[_Size,StreamName]}) ->
+next_state(S,_V,{call,?MODULE,request_stream_with_size,[_Size,StreamName]}) ->
     case lists:keymember(StreamName,2,S#state.streams) of
         false ->
             S#state{
                 counter = S#state.counter + 1,
-                streams = [{ID, StreamName, []}|S#state.streams]
+                streams = [{S#state.counter + 1, StreamName, []}|S#state.streams]
             };
         true ->
             S
@@ -115,62 +115,58 @@ next_state(S, _V, _Command) ->
 % met in order for a test to pass
 postcondition(S, {call,?MODULE,request_stream_with_size,[_Size,StreamName]}, Result) ->
     Stream = lists:keysearch(StreamName,2,S#state.streams),
-    case {Stream,Result} of
-        {{value,{StreamID,_StreamName,_Data}},ID} ->
-            StreamID =:= ID;
-        {false,_ID} ->
-            true;
+    case Stream of
+        {value,{StreamID,_StreamName,_Data}} ->
+            Result =:= StreamID;
         _ ->
-            false
+            true
     end;
 postcondition(S, {call,?MODULE,append,[StreamID,_Data]}, Result) ->
     case lists:keymember(StreamID,1,S#state.streams) of
         true ->
-            Result =:= casted;
+            Result =:= timeout;
         false ->
-            Result =:= unregistered_stream
+            Result =:= closed
     end;
-%postcondition(S, {call,?MODULE,simple_query,[StreamID,_Start,_End]}, Result) ->
-%    case Result of
-%        {ok, <<Payload/binary>>} ->
-%            Stream = lists:keysearch(StreamID,1,S#state.streams),
-%            case Stream of
-%                {value,{_StreamID, _StreamName, Expected}} ->
-%                    Observed = payload_to_list([],Payload),
-%                    Expected_Sorted = lists:sort([X || {_,X} <- Expected]),
-%                    Observed_Sorted = lists:sort([X || {_,X} <- Observed]),
-%                    Expected_Sorted =:= Observed_Sorted;
-%                _ ->
-%                    false
-%            end;
-%        _ ->
-%            false
-%    end;
-%postcondition(S, {call,?MODULE,all_since,[StreamID,Timestamp]}, Result) ->
-%    case Result of
-%        {ok, <<Payload/binary>>} ->
-%            Stream = lists:keysearch(StreamID,1,S#state.streams),
-%            case Stream of
-%                {value,{_StreamID, _StreamName, Expected}} ->
-%                    Observed = payload_to_list([],Payload),
-%                    Expected_Sorted = lists:sort([X || {Y,X} <- Expected, Y>Timestamp]),
-%                    Observed_Sorted = lists:sort([X || {_,X} <- Observed]),
-%                    Expected_Sorted =:= Observed_Sorted;
-%                _ ->
-%                    false
-%            end;
-%        _ ->
-%            false
-%    end;
-postcondition(S, {call,?MODULE,request_stream,[_Size,StreamName]}, Result) ->
-    Stream = lists:keysearch(StreamName,2,S#state.streams),
-    case {Stream,Result} of
-        {{value,{StreamID,_StreamName,_Data}},ID} ->
-            StreamID =:= ID;
-        {false,_ID} ->
-            true;
+postcondition(S, {call,?MODULE,simple_query,[StreamID,_Start,_End]}, Result) ->
+    case Result of
+        {ok, <<Payload/binary>>} ->
+            Stream = lists:keysearch(StreamID,1,S#state.streams),
+            case Stream of
+                {value,{_StreamID, _StreamName, Expected}} ->
+                    Observed = payload_to_list([],Payload),
+                    Expected_Sorted = lists:sort([X || {_,X} <- Expected]),
+                    Observed_Sorted = lists:sort([X || {_,X} <- Observed]),
+                    Expected_Sorted =:= Observed_Sorted;
+                _ ->
+                    false
+            end;
         _ ->
             false
+    end;
+postcondition(S, {call,?MODULE,all_since,[StreamID,Timestamp]}, Result) ->
+    case Result of
+        {ok, <<Payload/binary>>} ->
+            Stream = lists:keysearch(StreamID,1,S#state.streams),
+            case Stream of
+                {value,{_StreamID, _StreamName, Expected}} ->
+                    Observed = payload_to_list([],Payload),
+                    Expected_Sorted = lists:sort([X || {Y,X} <- Expected, Y>Timestamp]),
+                    Observed_Sorted = lists:sort([X || {_,X} <- Observed]),
+                    Expected_Sorted =:= Observed_Sorted;
+                _ ->
+                    false
+            end;
+        _ ->
+            false
+    end;
+postcondition(S, {call,?MODULE,request_stream,[_Size,StreamName]}, Result) ->
+    Stream = lists:keysearch(StreamName,2,S#state.streams),
+    case Stream of
+        {value,{StreamID,_StreamName,_Data}} ->
+            Result =:= StreamID;
+        _ ->
+            true
     end;
 postcondition(S, {call,?MODULE,last_entry_at,[StreamID,Timestamp]}, Result) ->
     case Result of

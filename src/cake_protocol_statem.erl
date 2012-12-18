@@ -257,12 +257,7 @@ tcp_query(Host,Port,Packet) ->
                     end
             end;
         error ->
-            case Result of
-                closed ->
-                    Output = unregistered_stream;
-                timeout ->
-                    Output = casted
-            end
+            Output = Result
     end,
     gen_tcp:close(Socket),
     Output.

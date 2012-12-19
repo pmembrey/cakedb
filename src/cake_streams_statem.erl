@@ -7,12 +7,10 @@
 -export([initial_state/0, command/1, precondition/2, postcondition/3,
         next_state/3]).
 
--record(state,{streams,counter}).
+-record(state,{starttime,counter,streams}).
 
 -define(SERVER, cake_stream_manager).
 -define(APP, cake).
--define(STREAMNAMES, [<<"tempfile">>, <<"file001">>, <<"anotherfile">>,
-        <<"somefile">>, <<"binfile">>, <<"cakestream">>]).
 
 %%-----------------------------------------------------------------------------
 %% Statem callbacks
@@ -25,17 +23,17 @@ initial_state() ->
 % define the commands to test
 command(S) ->
     oneof([
-           {call, ?SERVER, register_stream, [streamname()]},
-           {call, ?SERVER, stream_filename, [streamid(S)]},
-           {call, gproc, send, [{n,l,{stream,streamid(S)}},binary()]},
-           {call, gproc, send, [{n,l,{stream,streamid(S)}},clear]}
+           {call, ?SERVER, register_stream, [proper_utils:streamname()]},
+           {call, ?SERVER, stream_filename, [proper_utils:streamid(S)]},
+           {call, gproc, send, [{n,l,{stream,proper_utils:streamid(S)}},binary()]},
+           {call, gproc, send, [{n,l,{stream,proper_utils:streamid(S)}},clear]}
           ]).
 
 % define when a command is valid
 precondition(S, {call,gproc,send, [{n,l,{stream,StreamID}},_Msg]}) ->
     proplists:is_defined(StreamID, S#state.streams);
 precondition(_S, _command) ->
-    true. % All preconditions are valid
+    true.
 
 % define the state transitions triggered
 % by each command
@@ -92,35 +90,10 @@ prop_cake_streams_work() ->
                 application:start(?APP),
                 {History,State,Result} = run_commands(?MODULE, Cmds),
                 application:stop(?APP),
-                [cleanup(X) || {_,{_,X}} <- element(2,State)],
+                [proper_utils:cleanup(X) || {_,{_,X}} <- State#state.streams],
                 ?WHENFAIL(
                     io:format("\n\nHistory: ~w\n\nState: ~w\n\nResult: ~w\n\n",
                     [History,State,Result]),
                 aggregate(command_names(Cmds), Result =:= ok))
             end).
 
-%%-----------------------------------------------------------------------------
-%% generators
-%%-----------------------------------------------------------------------------
-
-streamname() -> 
-    elements(?STREAMNAMES).
-
-streamid(#state{counter = Counter}) ->
-    % for testing purpose, return any integer
-    % between zero and twice the counter plus one.
-    elements(lists:seq(0, 2*Counter+1)).
-
-%%-----------------------------------------------------------------------------
-%% utils
-%%-----------------------------------------------------------------------------
-
-cleanup(StreamName) ->
-    case application:get_env(cake,data_dir) of 
-        {ok,DataDir} -> DirName = DataDir++StreamName++"/",
-                        file:delete(DirName++StreamName++".index"),
-                        file:delete(DirName++StreamName++".data"),
-                        file:del_dir(DirName);
-        undefined ->    lager:warning("Couldn't delete CakeDB data directory: Couldn't find CakeDB data directory from config file...")
-    end,
-    ok.

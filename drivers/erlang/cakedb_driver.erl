@@ -68,33 +68,39 @@ init([]) ->
 handle_call({range_query,StreamName,Start,End}, _From, State) ->
     case lists:keysearch(StreamName,2,State#state.streams) of
         {value, {StreamID,StreamName}} ->
-            Message = list_to_binary([<<StreamID:16/big-integer>>,
-                    <<Start:64/big-integer>>, <<End:64/big-integer>>]),
-            Payload = cake_query(State#state.socket, ?QUERY, Message),
-            {reply, Payload, State};
+            NewState = State;
         false ->
-            {reply, [], State}
-    end;
+            StreamID = request_stream(State#state.socket,StreamName),
+            NewState = State#state{streams = [{StreamID, StreamName}|State#state.streams]}
+    end,
+    Message = list_to_binary([<<StreamID:16/big-integer>>,
+            <<Start:64/big-integer>>, <<End:64/big-integer>>]),
+    Payload = cake_query(State#state.socket, ?QUERY, Message),
+    {reply, Payload, NewState};
 
 handle_call({all_since, StreamName, Time}, _From, State) ->
     case lists:keysearch(StreamName,2,State#state.streams) of
         {value, {StreamID,StreamName}} ->
-            Message = list_to_binary([<<StreamID:16>>, <<Time:64/big-integer>>]),
-            Payload = cake_query(State#state.socket, ?ALL_SINCE, Message),
-            {reply, Payload, State};
+            NewState = State;
         false ->
-            {reply, [], State}
-    end;
+            StreamID = request_stream(State#state.socket,StreamName),
+            NewState = State#state{streams = [{StreamID, StreamName}|State#state.streams]}
+    end,
+    Message = list_to_binary([<<StreamID:16>>, <<Time:64/big-integer>>]),
+    Payload = cake_query(State#state.socket, ?ALL_SINCE, Message),
+    {reply, Payload, NewState};
 
 handle_call({last_entry_at, StreamName, Time}, _From, State) ->
     case lists:keysearch(StreamName,2,State#state.streams) of
         {value, {StreamID,StreamName}} ->
-            Message = list_to_binary([<<StreamID:16>>, <<Time:64/big-integer>>]),
-            Payload = cake_query(State#state.socket, ?LAST_ENTRY_AT, Message),
-            {reply, Payload, State};
+            NewState = State;
         false ->
-            {reply, [], State}
-    end;
+            StreamID = request_stream(State#state.socket,StreamName),
+            NewState = State#state{streams = [{StreamID, StreamName}|State#state.streams]}
+    end,
+    Message = list_to_binary([<<StreamID:16>>, <<Time:64/big-integer>>]),
+    Payload = cake_query(State#state.socket, ?LAST_ENTRY_AT, Message),
+    {reply, Payload, NewState};
 
 handle_call(stop, _From, State) ->
     {stop, normal, stopped, State}.

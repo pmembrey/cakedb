@@ -66,7 +66,6 @@ init([]) ->
     {ok, #state{socket=Socket, streams=[]}}.
 
 handle_call({range_query,StreamName,Start,End}, _From, State) ->
-%    io:format("~nIn range_query handle_call, StreamName: ~p, State: ~p~n~n",[StreamName,State]),
     case lists:keysearch(StreamName,2,State#state.streams) of
         {value, {StreamID,StreamName}} ->
             Message = list_to_binary([<<StreamID:16/big-integer>>,
@@ -103,14 +102,15 @@ handle_call(stop, _From, State) ->
 handle_cast({append, StreamName, Data}, State) ->
     case lists:keysearch(StreamName,2,State#state.streams) of
         {value, {StreamID,StreamName}} ->
-            ok;
+            NewState = State;
         false ->
-            StreamID = request_stream(State#state.socket,StreamName)
+            StreamID = request_stream(State#state.socket,StreamName),
+            NewState = State#state{streams = [{StreamID, StreamName}|State#state.streams]}
     end,
     Message = list_to_binary([<<StreamID:16>>,Data]),
     Packet = packet(?APPEND,Message),
     gen_tcp:send(State#state.socket, Packet),
-    {noreply, State#state{streams = [{StreamID, StreamName}|State#state.streams]}}.
+    {noreply, NewState}.
 
 handle_info(Msg, State) ->
     lager:info("Unexpected message: ~p~n",[Msg]),

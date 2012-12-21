@@ -26,6 +26,9 @@ CakeDB Erlang Driver
 1. Compile the cakedb_driver and cakedb_driver_tests modules:
 
 `> c(cakedb_driver).`
+
+and
+
 `> c(cakedb_driver_tests).`
 
 2. Insure an instance of CakeDB is running on

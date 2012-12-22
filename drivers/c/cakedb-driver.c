@@ -106,20 +106,16 @@ void read_util(int fd, void *data, size_t size)
   }
 }
 
-int create_network_link(char *ip, short int port)
+int create_network_link(struct sockaddr_in saddr)
 {
   int s;
-  struct sockaddr_in saddr;
 
-  printf("Connecting to server %s on port %d\n", ip, (int) port);
+  printf("Connecting to server %s on port %d\n",
+	 inet_ntoa(saddr.sin_addr), ntohs(saddr.sin_port));
 
   s = socket(AF_INET, SOCK_STREAM, 0);
   if (s == -1)
     error("Could not open socket");
-
-  saddr.sin_family = AF_INET;
-  saddr.sin_port = htons(port);
-  saddr.sin_addr.s_addr = inet_addr(ip);
 
   if (connect(s, (struct sockaddr *) &saddr, sizeof(saddr)))
     error("Could not connect");
@@ -127,31 +123,25 @@ int create_network_link(char *ip, short int port)
   return (s);
 }
 
-int16_t register_stream(char *ip, short int port, char *stream_name)
+int16_t register_stream(struct sockaddr_in saddr, char *stream_name)
 {
   t_reg reg;
-  int s = sizeof(reg.name);
+  int s;
   int i;
   int16_t sid;
 
   printf("registering stream %s\n", stream_name);
 
-  s = create_network_link(ip, port);
+  s = create_network_link(saddr);
 
   reg.cmd = htons(5);
   strncpy(reg.name, stream_name, 512);
   i = strlen(stream_name);
   reg.length = htonl(i);
 
-  i = write(s, &reg, i + 6);
-  printf("Wrote %d bytes\n", (int) i);
-  if (i <= 0)
-    error("Failed sending stream name");
+  write_util(s, &reg, i + 6);
 
-  i = read(s, &sid, sizeof(sid));
-  printf("Read %d bytes\n", (int) i);
-  if (i <= 0)
-    error("Failed to receive stream id");
+  read_util(s, &sid, sizeof(sid));
 
   sid = ntohs(sid); // Convert sid to host endianess
   printf("received stream id: %d\n", (int) sid);
@@ -182,19 +172,19 @@ void send_data(int socket, int fd, size_t size)
   }
 }
 
-void store(char *ip, short int port, char *stream_name, char *filename)
+void store(struct sockaddr_in saddr, char *stream_name, char *filename)
 {
   t_data data;
   int s;
   int i;
   int fd;
   int size;
-  int16_t streamId = register_stream(ip, port, stream_name);
+  int16_t streamId = register_stream(saddr, stream_name);
   struct stat sb;
 
   printf("storing data from file %s on cakedb\n", filename);
 
-  s = create_network_link(ip, port);
+  s = create_network_link(saddr);
 
   if (stat(filename, &sb))
     error("Cannot stat file");
@@ -235,18 +225,18 @@ void recv_data(int socket, int fd, size_t size)
   }
 }
 
-void query(char *ip, short int port, char *stream_name, char *filename, int64_t timestamp)
+void query(struct sockaddr_in saddr, char *stream_name, char *filename, int64_t timestamp)
 {
   int s;
   int fd;
   t_get get;
   int32_t size;
-  int16_t streamId = register_stream(ip, port, stream_name);
+  int16_t streamId = register_stream(saddr, stream_name);
 
   printf("querying all data from timestamp %lld to file %s\n",
 	 timestamp, filename);
 
-  s = create_network_link(ip, port);
+  s = create_network_link(saddr);
 
   fd = open(filename, O_WRONLY | O_TRUNC | O_CREAT, 0664);
   if (fd == -1)
@@ -272,18 +262,18 @@ void query(char *ip, short int port, char *stream_name, char *filename, int64_t 
   close(fd);
 }
 
-void range(char *ip, short int port, char *stream_name, char *filename, int64_t from, int64_t to)
+void range(struct sockaddr_in saddr, char *stream_name, char *filename, int64_t from, int64_t to)
 {
   int s;
   int fd;
   t_get get;
   int32_t size;
-  int16_t streamId = register_stream(ip, port, stream_name);
+  int16_t streamId = register_stream(saddr, stream_name);
 
   printf("querying all data in range timestamp [%lld, %lld] to file %s\n",
 	 from, to, filename);
 
-  s = create_network_link(ip, port);
+  s = create_network_link(saddr);
 
   fd = open(filename, O_WRONLY | O_TRUNC | O_CREAT, 0664);
   if (fd == -1)
@@ -310,91 +300,129 @@ void range(char *ip, short int port, char *stream_name, char *filename, int64_t 
 
 }
 
-short int get_port(char *ip)
+struct sockaddr_in parseIp(char *ip_port)
 {
+  struct sockaddr_in saddr;
+  char ip[INET_ADDRSTRLEN];
   short int port;
-  char *ip_ptr = ip;
+  int i;
 
-  while (*ip != 0 && *ip != ':')
-    ++ip;
-  if (*ip == ':')
+  memset(ip, 0, sizeof(ip)/sizeof(*ip));
+
+  for (i = 0; *ip_port != 0; ++i)
   {
-    *ip = 0;
-    ++ip;
+    if (*ip_port == ':')
+    {
+      ++ip_port;
+      break;
+    }
+    ip[i] = *ip_port;
+    ++ip_port;
   }
-  port = atoi(ip);
+  port = atoi(ip_port);
 
-  printf("ip %s\n", ip_ptr);
+  saddr.sin_family = AF_INET;
+  saddr.sin_port = htons(port);
+  saddr.sin_addr.s_addr = inet_addr(ip);
+
+  printf("ip %s\n", ip);
   printf("port %d\n", (int) port);
-  return (port);
+
+  return (saddr);
+}
+
+void register_main(char *exename, int argc, char **argv)
+{
+  struct sockaddr_in saddr;
+  char *stream_name;
+
+  if (argc < 2)
+    usage(exename);
+
+  saddr = parseIp(argv[0]);
+  stream_name = argv[1];
+
+  register_stream(saddr, stream_name);
+}
+
+void store_main(char *exename, int argc, char **argv)
+{
+  struct sockaddr_in saddr;
+  char *stream_name;
+  char *filename;
+
+  if (argc < 3)
+    usage(exename);
+
+  saddr = parseIp(argv[0]);
+  stream_name = argv[1];
+  filename = argv[2];
+  store(saddr, stream_name, filename);
+}
+
+void query_main(char *exename, int argc, char **argv)
+{
+  struct sockaddr_in saddr;
+  char *stream_name;
+  char *filename;
+  int64_t ts_from;
+
+  if (argc < 4)
+    usage(exename);
+
+  saddr = parseIp(argv[0]);
+  stream_name = argv[1];
+  filename = argv[2];
+  ts_from = strtol(argv[3], 0, 10);
+
+  query(saddr, stream_name, filename, ts_from);
+}
+
+void range_main(char *exename, int argc, char **argv)
+{
+  struct sockaddr_in saddr;
+  char *stream_name;
+  char *filename;
+  int64_t ts_from;
+  int64_t ts_to;
+
+  if (argc < 5)
+    usage(exename);
+
+  saddr = parseIp(argv[0]);
+  stream_name = argv[1];
+  filename = argv[2];
+  ts_from = strtol(argv[3], 0, 10);
+  ts_to = strtol(argv[4], 0, 10);
+
+  range(saddr, stream_name, filename, ts_from, ts_to);
 }
 
 int main(int argc, char **argv)
 {
   char *exename = argv[0];
-  char *command = argv[1];
-  char *stream_name;
-  char *filename;
-  int64_t ts_from;
-  int64_t ts_to;
-  char *ip;
-  short int port;
+  char *command;
+  int command_argc;
+  char **command_argv;
 
   if (argc < 2)
     usage(exename);
 
   command = argv[1];
+  command_argc = argc - 2;
+  command_argv = argv + 2;
 
   if (!strcmp("help", command))
-  {
     usage(exename);
-  }
     
-  if (argc < 3)
-    usage(exename);
-
-  ip = argv[2];
-  // This method modifies the param to leave only the ip
-  port = get_port(ip);
-
   if (!strcmp("register", command))
-  {
-    if (argc < 4)
-      usage(exename);
-
-    stream_name = argv[3];
-    register_stream(ip, port, stream_name);
-  }
+    register_main(exename, command_argc, command_argv);
   else if (!strcmp("store", command))
-  {
-    if (argc < 5)
-      usage(exename);
-
-    stream_name = argv[3];
-    filename = argv[4];
-    store(ip, port, stream_name, filename);
-  }
+    store_main(exename, command_argc, command_argv);
   else if (!strcmp("query", command))
-  {
-    if (argc < 6)
-      usage(exename);
-
-    stream_name = argv[3];
-    filename = argv[4];
-    ts_from = strtol(argv[5], 0, 10);
-    query(ip, port, stream_name, filename, ts_from);
-  }
+    query_main(exename, command_argc, command_argv);
   else if (!strcmp("range", command))
-  {
-    if (argc < 7)
-      usage(exename);
-
-    stream_name = argv[3];
-    filename = argv[4];
-    ts_from = strtol(argv[5], 0, 10);
-    ts_to = strtol(argv[6], 0, 10);
-    range(ip, port, stream_name, filename, ts_from, ts_to);
-  }
+    range_main(exename, command_argc, command_argv);
   else
     usage(exename);
 

@@ -13,5 +13,11 @@ public class Event {
         this.timestamp = timestamp;
         this.payload = payload;
     }
-
+    
+    public  String toString() {
+    
+        String payload = new String(this.payload);
+        return "{Timestamp: " + this.timestamp
+            + ", Payload: " + payload + "}";
+    }
 }

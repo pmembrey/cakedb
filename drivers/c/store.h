@@ -3,8 +3,15 @@
 
 #include <netinet/in.h>
 
-void store(struct sockaddr_in saddr, char *stream_name, char *filename);
+/**
+ * Send a store (append) request to cakedb server
+ */
+void store(struct sockaddr_in saddr, const char *stream_name,
+	   const char *filename);
 
-void store_main(char *exename, int argc, char **argv);
+/**
+ * Main function for store standalone
+ */
+void store_main(const char *exename, int argc, const char * const *argv);
 
 #endif	/* STORE_H_ */

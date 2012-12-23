@@ -3,8 +3,14 @@
 
 #include <netinet/in.h>
 
-int16_t register_stream(struct sockaddr_in saddr, char *stream_name);
+/**
+ * Send a register stream request to cakedb server
+ */
+int16_t register_stream(struct sockaddr_in saddr, const char *stream_name);
 
-void register_main(char *exename, int argc, char **argv);
+/**
+ * Main function for register standalone
+ */
+void register_main(const char *exename, int argc, const char * const *argv);
 
 #endif	/* REGISTER_H_ */

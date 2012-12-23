@@ -9,7 +9,7 @@ OBJS	=	cakedb-driver.o		\
 
 DFLAGS	=	-D_GNU_SOURCE
 
-CFLAGS	=	-Wall -Wstrict-prototypes -Wlong-long -Werror -std=c99 -pedantic
+CFLAGS	=	-W -Wall -Wstrict-prototypes -Wshadow -Werror -std=c99 -pedantic
 
 CC	=	cc
 
@@ -33,7 +33,7 @@ re:	fclean all
 
 
 cakedb-driver:	$(OBJS)
-	${CC} ${CFLAGS} $(OBJS) -o $(NAME)
+	${CC} ${CFLAGS} ${DFLAGS} $(OBJS) -o $(NAME)
 
 cakedb-driver.o:	cakedb-driver.c \
 			cakedb-driver.h \

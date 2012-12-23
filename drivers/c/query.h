@@ -3,8 +3,15 @@
 
 #include <netinet/in.h>
 
-void query(struct sockaddr_in saddr, char *stream_name, char *filename, int64_t timestamp);
+/**
+ * Send a query (all since) request to cakedb server
+ */
+void query(struct sockaddr_in saddr, const char *stream_name,
+	   const char *filename, int64_t timestamp);
 
-void query_main(char *exename, int argc, char **argv);
+/**
+ * Main function for query standalone
+ */
+void query_main(const char *exename, int argc, const char * const *argv);
 
 #endif

@@ -9,7 +9,11 @@
 #include "register.h"
 #include "query.h"
 
-void query(struct sockaddr_in saddr, char *stream_name, char *filename, int64_t timestamp)
+/**
+ * Send a query (all since) request to cakedb server
+ */
+void query(struct sockaddr_in saddr, const char *stream_name,
+	   const char *filename, int64_t timestamp)
 {
   int s;
   int fd;
@@ -28,8 +32,8 @@ void query(struct sockaddr_in saddr, char *stream_name, char *filename, int64_t 
 
   /* Send a query request */
   size = 2 + 8; /* sid + from */
-  get.header.length = htonl(size);
-  get.header.cmd = htons(4);
+  get.length = htonl(size);
+  get.cmd = htons(4);
   get.sid = htons(streamId);
   get.from = htobe64(timestamp);
   /* to timestamp is not set, do not send it */
@@ -46,11 +50,14 @@ void query(struct sockaddr_in saddr, char *stream_name, char *filename, int64_t 
   close(fd);
 }
 
-void query_main(char *exename, int argc, char **argv)
+/**
+ * Main function for query standalone
+ */
+void query_main(const char *exename, int argc, const char * const *argv)
 {
   struct sockaddr_in saddr;
-  char *stream_name;
-  char *filename;
+  const char *stream_name;
+  const char *filename;
   int64_t ts_from;
 
   if (argc < 4)

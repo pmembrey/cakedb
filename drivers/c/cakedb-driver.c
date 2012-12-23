@@ -8,18 +8,31 @@
 #include "query.h"
 #include "range.h"
 
+/**
+ * Simple error handler
+ * An error is important, this function will exit the application when used.
+ * Use warning instead if exit is too brutal.
+ * Logs message to stderr
+ */
 void error(const char *str)
 {
   fprintf(stderr, "Error: %s\n", str);
   exit(EXIT_FAILURE);
 }
 
+/**
+ * Simple warning handler
+ * Logs message to stderr
+ */
 void warning(const char *str)
 {
   fprintf(stderr, "Warning: %s\n", str);
 }
 
-void usage(char *exename)
+/**
+ * Print the application's usage
+ */
+void usage(const char *exename)
 {
   fprintf(stdout, "Usage:\n");
   fprintf(stdout, "%s help\n", exename);
@@ -30,12 +43,16 @@ void usage(char *exename)
   exit(EXIT_SUCCESS);
 }
 
-int main(int argc, char **argv)
+
+/******************************/
+
+
+int main(int argc, const char * const *argv)
 {
-  char *exename = argv[0];
-  char *command;
+  const char *exename = argv[0];
+  const char *command;
   int command_argc;
-  char **command_argv;
+  const char * const *command_argv;
 
   if (argc < 2)
     usage(exename);

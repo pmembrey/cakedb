@@ -3,8 +3,15 @@
 
 #include <netinet/in.h>
 
-void range(struct sockaddr_in saddr, char *stream_name, char *filename, int64_t from, int64_t to);
+/**
+ * Send a range (simple query) request to cakedb server
+ */
+void range(struct sockaddr_in saddr, const char *stream_name,
+	   const char *filename, int64_t from, int64_t to);
 
-void range_main(char *exename, int argc, char **argv);
+/**
+ * Main function for range standalone
+ */
+void range_main(const char *exename, int argc, const char * const *argv);
 
 #endif	/* RANGE_H_ */

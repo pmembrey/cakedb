@@ -6,37 +6,49 @@
 #include "network.h"
 #include "register.h"
 
-int16_t register_stream(struct sockaddr_in saddr, char *stream_name)
+/**
+ * Send a register request to cakedb server
+ */
+int16_t register_stream(struct sockaddr_in saddr, const char *stream_name)
 {
-  t_head reg;
+  t_head header;
   int s;
-  int i;
+  int32_t i;
   int16_t sid;
 
   printf("registering stream %s\n", stream_name);
 
   s = create_network_link(saddr);
 
-  reg.cmd = htons(5);
+  /* Send an register stream request */
+  header.cmd = htons(5);
   i = strlen(stream_name);
-  reg.length = htonl(i);
+  header.length = htonl(i);
 
-  write_util(s, &reg, sizeof(reg));
+  /* Send header to cakedb */
+  write_util(s, &header, sizeof(header.cmd) + sizeof(header.length));
+
+  /* Send stream name to cakedb */
   write_util(s, stream_name, i);
 
+  /* Read stream id returned by cakedb */
   read_util(s, &sid, sizeof(sid));
 
-  sid = ntohs(sid); // Convert sid to host endianess
+  /* Convert sid to host endianess */
+  sid = ntohs(sid);
   printf("received stream id: %d\n", (int) sid);
 
   close(s);
   return (sid);
 }
 
-void register_main(char *exename, int argc, char **argv)
+/**
+ * Main function for register standalone
+ */
+void register_main(const char *exename, int argc, const char * const *argv)
 {
   struct sockaddr_in saddr;
-  char *stream_name;
+  const char *stream_name;
 
   if (argc < 2)
     usage(exename);

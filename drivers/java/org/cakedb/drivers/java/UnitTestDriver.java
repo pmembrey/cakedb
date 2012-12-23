@@ -74,6 +74,13 @@ public class UnitTestDriver {
 			//check it has the timestamp (unique ID) of the last document we inserted
 			assertEquals(last_at_event.timestamp,events.get(99).timestamp);
 
+                        //make sure querying lastEntryAt with a very old timestamp returns null
+                        //and does not crash the driver
+                        last_at_event = driver.lastEntryAt(teststream,0);
+
+                        assertNull(last_at_event);
+
+
 		} catch (Exception e) {
 			e.printStackTrace();
 			fail(e.getMessage());

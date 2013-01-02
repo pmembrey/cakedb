@@ -80,11 +80,11 @@ retrieve_data(retrieve_last_entry_at, DataFile, _FoundData, [At], ?MESSAGE_PACKA
 
 retrieve_data(simple_query, DataFile, FoundData, [From, To], ?MESSAGE_PACKAGE) ->
     case (TS >= From) and (TS =< To) of
-	true -> retrieve_data(simple_query, DataFile, [<<TS:64/big-integer, Size:32/big-integer, Data/binary>> | FoundData], From, To);
+	true -> retrieve_data(simple_query, DataFile, [<<TS:64/big-integer, Size:32/big-integer, Data/binary>> | FoundData], [From, To]);
 	false -> case TS < To of 
 		     true -> retrieve_data(simple_query, DataFile, FoundData, [From, To]);
                      false -> ok = file:close(DataFile),
-                     list_to_binary(lists:flatten(lists:reverse(FoundData)))
+		     FoundData
 		 end
     end;
 

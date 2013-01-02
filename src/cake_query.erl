@@ -13,7 +13,7 @@
 %% Thoughs on defining MESSAGE_PACKAGE as [?MESSAGE_HEADER, ?MESSAGE] or <<?MESSAGE_HEADER, ?MESSAGE>> for evolution.
 %% At this time, only TS, Size and Data are necessary for operation functions.
 %% CRC32 is processed at an upper level.
--define(MESSAGE_PACKAGE, [TS:64/native-integer, Size:32/native-integer, Data:Size/binary]).
+-define(MESSAGE_PACKAGE, [TS, Size, Data]).
 
 
 
@@ -37,11 +37,13 @@ open_data_file(FileName) ->
     DataFile.
 
 retrieve_data(Operation, StreamID, ConditionList) ->
-    DataFile = retrieve_data_init(StreamID),
-    retrieve_data(Operation, DataFile, [], ConditionList)
+    [At | _] = ConditionList,
+    DataFile = retrieve_data_init(StreamID, At),
+    FoundData = retrieve_data(Operation, DataFile, [], ConditionList),
+    list_to_binary(lists:flatten(lists:reverse(FoundData)))
     .
 
-retrieve_data_init(StreamID) ->
+retrieve_data_init(StreamID, At) ->
     {ok, File} = cake_stream_manager:stream_filename(StreamID),
     Offset = get_indexed_offset(StreamID, At),
     lager:debug("Offset from get_indexed_offset: ~p", [Offset]),
@@ -56,7 +58,7 @@ retrieve_data(Operation, DataFile, FoundData, ConditionList) ->
         {ok, ?MESSAGE_HEADER} ->
             case file:read(DataFile, Size+3) of
                 {ok,?MESSAGE} -> case CRC32 == erlang:crc32(Data) of
-                                                true -> retrieve_data(Operation, DataFile, FoundData, ConditionList, ?MESSAGE_PACKAGE)
+                                                true -> retrieve_data(Operation, DataFile, FoundData, ConditionList, ?MESSAGE_PACKAGE);
                                                 false -> ok = file:close(DataFile),
                                                          lager:warning("Message: CRC32 Checksum failed on ~p", [TS]),
                                                          FoundData
@@ -72,29 +74,26 @@ retrieve_data(Operation, DataFile, FoundData, ConditionList) ->
 
 retrieve_data(retrieve_last_entry_at, DataFile, _FoundData, [At], ?MESSAGE_PACKAGE) ->
     case TS < At of
-	true -> retrieve_data(retrieve_last_entry_at, DataFile, <<TS:64/big-integer, Size:32/big-integer, Data/binary>>, At);
-        false -> retrieve_data(retrieve_last_entry_at, DataFile, <<>>, At)
-    end
-    .
+	true -> retrieve_data(retrieve_last_entry_at, DataFile, [<<TS:64/big-integer, Size:32/big-integer, Data/binary>>], [At]);
+        false -> retrieve_data(retrieve_last_entry_at, DataFile, <<>>, [At])
+    end;
 
 retrieve_data(simple_query, DataFile, FoundData, [From, To], ?MESSAGE_PACKAGE) ->
     case (TS >= From) and (TS =< To) of
 	true -> retrieve_data(simple_query, DataFile, [<<TS:64/big-integer, Size:32/big-integer, Data/binary>> | FoundData], From, To);
 	false -> case TS < To of 
-		     true -> retrieve_data(simple_query, DataFile, FoundData, From, To);
+		     true -> retrieve_data(simple_query, DataFile, FoundData, [From, To]);
                      false -> ok = file:close(DataFile),
                      list_to_binary(lists:flatten(lists:reverse(FoundData)))
 		 end
-    end
-    .
+    end;
 
 retrieve_data(all_since_query, DataFile, FoundData, [From], ?MESSAGE_PACKAGE) ->
     case TS > From of
-	true -> retrieve_data(all_since_query, DataFile, [<<TS:64/big-integer, Size:32/big-integer, Data/binary>> | FoundData], From);
-        false -> retrieve_data(all_since_query, DataFile, FoundData, From)
+	true -> retrieve_data(all_since_query, DataFile, [<<TS:64/big-integer, Size:32/big-integer, Data/binary>> | FoundData], [From]);
+        false -> retrieve_data(all_since_query, DataFile, FoundData, [From])
     end
     .
-
 
 
 

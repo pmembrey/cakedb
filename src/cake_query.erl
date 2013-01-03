@@ -38,7 +38,8 @@ retrieve_last_entry_at(DataFile,FoundData,At) ->
                 {ok,?MESSAGE} -> case CRC32 == erlang:crc32(Data) of
                                                 true -> case TS < At of
                                                             true -> retrieve_last_entry_at(DataFile,<<TS:64/big-integer,Size:32/big-integer,Data/binary>>,At);
-                                                            false -> retrieve_last_entry_at(DataFile,<<>>,At)
+                                                            false -> ok = file:close(DataFile),
+                                                                     FoundData
                                                         end;
                                                 false -> ok = file:close(DataFile),
                                                          lager:warning("Message: CRC32 Checksum failed on ~p",[TS]),

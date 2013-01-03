@@ -70,10 +70,10 @@ retrieve_data(Operation, DataFile, FoundData, ConditionList) ->
     end
     .
 
-retrieve_data(retrieve_last_entry_at, DataFile, _FoundData, [At], ?MESSAGE_PACKAGE) ->
+retrieve_data(retrieve_last_entry_at, DataFile, FoundData, [At], ?MESSAGE_PACKAGE) ->
     case TS < At of
 	true -> retrieve_data(retrieve_last_entry_at, DataFile, [<<TS:64/big-integer, Size:32/big-integer, Data/binary>>], [At]);
-        false -> retrieve_data(retrieve_last_entry_at, DataFile, <<>>, [At])
+        false -> FoundData
     end;
 
 retrieve_data(simple_query, DataFile, FoundData, [From, To], ?MESSAGE_PACKAGE) ->

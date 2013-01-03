@@ -40,6 +40,7 @@ retrieve_data(Operation, StreamID, ConditionList) ->
     [At | _] = ConditionList,
     DataFile = retrieve_data_init(StreamID, At),
     FoundData = retrieve_data(Operation, DataFile, [], ConditionList),
+    ok = file:close(DataFile),
     list_to_binary(lists:flatten(lists:reverse(FoundData)))
     .
 
@@ -59,16 +60,13 @@ retrieve_data(Operation, DataFile, FoundData, ConditionList) ->
             case file:read(DataFile, Size+3) of
                 {ok,?MESSAGE} -> case CRC32 == erlang:crc32(Data) of
                                                 true -> retrieve_data(Operation, DataFile, FoundData, ConditionList, ?MESSAGE_PACKAGE);
-                                                false -> ok = file:close(DataFile),
-                                                         lager:warning("Message: CRC32 Checksum failed on ~p", [TS]),
+                                                false -> lager:warning("Message: CRC32 Checksum failed on ~p", [TS]),
                                                          FoundData
                                             end;
-                eof -> ok = file:close(DataFile),
-                       lager:warning("EOF: Not enough data - attempted to read ~p bytes", [Size]),
+                eof -> lager:warning("EOF: Not enough data - attempted to read ~p bytes", [Size]),
                        FoundData
             end;
-        _ -> ok = file:close(DataFile), 
-            FoundData
+        _ -> FoundData
     end
     .
 
@@ -83,8 +81,7 @@ retrieve_data(simple_query, DataFile, FoundData, [From, To], ?MESSAGE_PACKAGE) -
 	true -> retrieve_data(simple_query, DataFile, [<<TS:64/big-integer, Size:32/big-integer, Data/binary>> | FoundData], [From, To]);
 	false -> case TS < To of 
 		     true -> retrieve_data(simple_query, DataFile, FoundData, [From, To]);
-                     false -> ok = file:close(DataFile),
-		     FoundData
+                     false -> FoundData
 		 end
     end;
 

@@ -225,8 +225,10 @@ public class Driver {
 		//create a buffer & read in rest of stream
 		byte[] buf = new byte[length];
 		inFromServer.readFully(buf);
+
+                List<Event> data = extractData(buf);
 		
-		return extractData(buf).get(0);
+		return (data.size() > 0) ? data.get(0) : null;
 
 	}
 

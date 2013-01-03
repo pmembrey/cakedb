@@ -22,19 +22,19 @@ stop({Pid,_StreamName,_StartTime}) ->
  
 instantiator({_Pid,StreamName,StartTime}) ->
     Range_query = cakedb_driver:range_query(StreamName,StartTime,timestamp()),
-    [{_TS1,Data1},{_TS2,Data2},{_TS3,Data3}] = Range_query,
     All_since = cakedb_driver:all_since(StreamName,StartTime),
-    [{_TS4,Data4},{_TS5,Data5},{_TS6,Data6}] = All_since,
     Last_entry_at = cakedb_driver:last_entry_at(StreamName,timestamp()),
-    [{_TS7,Data7}] = Last_entry_at,
     [
-        ?_assertEqual(Data1,"HelloWorld"),
-        ?_assertEqual(Data2,"SomeData"),
-        ?_assertEqual(Data3,"SomeMoreData"),
-        ?_assertEqual(Data4,"HelloWorld"),
-        ?_assertEqual(Data5,"SomeData"),
-        ?_assertEqual(Data6,"SomeMoreData"),
-        ?_assertEqual(Data7,"SomeMoreData")
+        ?_assertMatch([{_,_},{_,_},{_,_}],Range_query),
+        ?_assertEqual(element(2,lists:nth(1,Range_query)),"HelloWorld"),
+        ?_assertEqual(element(2,lists:nth(2,Range_query)),"SomeData"),
+        ?_assertEqual(element(2,lists:nth(3,Range_query)),"SomeMoreData"),
+        ?_assertMatch([{_,_},{_,_},{_,_}],All_since),
+        ?_assertEqual(element(2,lists:nth(1,All_since)),"HelloWorld"),
+        ?_assertEqual(element(2,lists:nth(2,All_since)),"SomeData"),
+        ?_assertEqual(element(2,lists:nth(3,All_since)),"SomeMoreData"),
+        ?_assertMatch([{_,_}],Last_entry_at),
+        ?_assertEqual(element(2,lists:nth(1,Last_entry_at)),"SomeMoreData")
     ].
         
 cakedb_driver_test_() ->

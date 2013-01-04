@@ -8,5 +8,5 @@
                   stdlib
                  ]},
   {mod, {cake_app, []}},
-  {env, [{write_delay,10000}]}
+  {env, []}
  ]}.

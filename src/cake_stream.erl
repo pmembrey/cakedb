@@ -109,13 +109,9 @@ writer_init(From,Stream,SliceName) ->
 	IndexFile = Path ++ SliceName ++ ".index",
 	lager:debug("Data File:   ~p",[DataFile]),
 	lager:debug("Index File:  ~p",[IndexFile]),
-        {ok,WriteDelay} = application:get_env(cake,write_delay),
-        
-         % Wait for 50MB or WriteDelay milliseconds before flushing
-	{ok,File} = file:open(DataFile,[append,raw,{delayed_write, 50*1024*1024, WriteDelay}]),
-
+        {ok,File}   = file:open(DataFile,[append,raw,{delayed_write, 50*1024*1024, 10000}]),  % Wait for 50MB of 10 seconds before flushing
         {ok,FileInfo} = file:read_file_info(DataFile),
-	{ok,Index}  = file:open(IndexFile,[append,raw]),
+        {ok,Index}  = file:open(IndexFile,[append,raw]),
 
 	Details = #stream_state{
 					from            = From,

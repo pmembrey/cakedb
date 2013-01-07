@@ -4,10 +4,7 @@
 
 -include_lib("proper/include/proper.hrl").
 
--export([initial_state/0, command/1, precondition/2, postcondition/3,
-        next_state/3,request_stream/1,request_stream_with_size/2,
-        append/2,simple_query/3,all_since/2,last_entry_at/2,
-        timestamp/0,payload_to_list/2]).
+-export([initial_state/0, command/1, precondition/2, postcondition/3, next_state/3]).
 
 -define(STREAMNAMES, [<<"tempfile">>, <<"file001">>, <<"anotherfile">>,
         <<"somefile">>, <<"binfile">>, <<"cakestream">>]).
@@ -103,7 +100,7 @@ postcondition(S, {call,cakedb_driver,range_query,[StreamName,Start,End]}, Result
             case lists:keysearch(StreamName,1,S#state.streams) of
                 {value, {StreamName,Data}} ->
                     Expected = lists:sort([Y || {X,Y} <- Data, X>=Start, X=<End]),
-                    Observed = lists:sort([Y || {X,Y} <- Result, X>=Start, X=<End]),
+                    Observed = lists:sort([Y || {_,Y} <- Result]),
                     Observed =:= Expected;
                 false ->
                     Result =:= []
@@ -113,7 +110,7 @@ postcondition(S, {call,cakedb_driver,all_since,[StreamName,Time]}, Result) ->
     case lists:keysearch(StreamName,1,S#state.streams) of
         {value, {StreamName,Data}} ->
             Expected = lists:sort([Y || {X,Y} <- Data, X>=Time]),
-            Observed = lists:sort([Y || {X,Y} <- Result, X>=Start, X=<End]),
+            Observed = lists:sort([Y || {_,Y} <- Result]),
             Observed =:= Expected;
         false ->
             Result =:= []

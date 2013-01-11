@@ -28,7 +28,7 @@ retrieve_last_entry_at(StreamID,At) ->
     lager:debug("Offset from get_indexed_offset: ~p", [Offset]),
     DataFile = open_data_file(File),
     {ok,Offset} = file:position(DataFile,Offset),
-    retrieve_last_entry_at(DataFile,[],At).
+    retrieve_last_entry_at(DataFile,<<>>,At).
 
 
 retrieve_last_entry_at(DataFile,FoundData,At) ->

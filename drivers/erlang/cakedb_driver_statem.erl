@@ -8,7 +8,7 @@
         postcondition/3, next_state/3, diff/2, sum/2, timestamp/0]).
 
 -define(DRIVER, cakedb_driver).
-
+-define(TIMEOUT, 1000). % milliseconds
 -define(STREAMNAMES, ["tempfile", "file001", "anotherfile",
         "somefile", "binfile", "cakestream"]).
 
@@ -38,26 +38,29 @@ initial_state() ->
 
 % define the commands to test
 command(S) ->
-    oneof([
-        symb_call(append, elements(?STREAMNAMES), null),
-%        symb_call(range_query, elements(?STREAMNAMES), S#state.starttime),
-        symb_call(all_since, elements(?STREAMNAMES), S#state.starttime)%,
-%        symb_call(last_entry_at, elements(?STREAMNAMES), S#state.starttime)
-    ]).
+    frequency(
+        [
+            {9,{call,?DRIVER,append,[elements(?STREAMNAMES),list(integer(65,122))]}},
+            {1,symb_call(range_query, elements(?STREAMNAMES), S#state.starttime)},
+            {1,symb_call(all_since, elements(?STREAMNAMES), S#state.starttime)},
+            {1,symb_call(last_entry_at, elements(?STREAMNAMES), S#state.starttime)}
+        ]
+    ).
 
 % define when a command is valid
-precondition(S,{call,?DRIVER,last_entry_at,[StreamName,TS]}) ->
+precondition(S,{call,?DRIVER,_Query,[StreamName|_OtherArgs]}) ->
     case lists:keysearch(StreamName,1,S#state.streams) of
         {value, {StreamName,Data}} ->
             case Data of
                 [] ->
-                    false;
+                    true;
                 _ ->
-                    TimeStamps = [X || {X,_} <- Data],
-                    TS > lists:min(TimeStamps)
+                    % Make sure CakeDB had time to flush
+                    timer:sleep(?TIMEOUT),
+                    true
             end;
         false ->
-            false
+            true
     end;
 precondition(_S, _Command) ->
     true.
@@ -74,21 +77,7 @@ next_state(S,_V,{call,?DRIVER,append,[StreamName,Data]}) ->
             NewTuple = {StreamName,[{timestamp(),Data}]},
             S#state{streams = [NewTuple|S#state.streams]}
     end;
-next_state(S,_V,{call,?DRIVER,range_query,[StreamName,_Start,_End]}) ->
-    case lists:keysearch(StreamName,1,S#state.streams) of
-        {value, {StreamName,_Data}} ->
-            S;
-        false ->
-            S#state{streams = [{StreamName,[]}|S#state.streams]}
-    end;
-next_state(S,_V,{call,?DRIVER,all_since,[StreamName,_TS]}) ->
-    case lists:keysearch(StreamName,1,S#state.streams) of
-        {value, {StreamName,_Data}} ->
-            S;
-        false ->
-            S#state{streams = [{StreamName,[]}|S#state.streams]}
-    end;
-next_state(S,_V,{call,?DRIVER,last_entry_at,[StreamName,_TS]}) ->
+next_state(S,_V,{call,?DRIVER,_Query,[StreamName|_OtherArgs]}) ->
     case lists:keysearch(StreamName,1,S#state.streams) of
         {value, {StreamName,_Data}} ->
             S;
@@ -101,36 +90,48 @@ next_state(S,_V,{call,?DRIVER,last_entry_at,[StreamName,_TS]}) ->
 postcondition(S, {call,?DRIVER,range_query,[StreamName,Start,End]}, Result) ->
     case Start > End of
         true ->
-            Result =:= [];
+            Expected = [];
         false ->
             case lists:keysearch(StreamName,1,S#state.streams) of
                 {value, {StreamName,Data}} ->
-                    Expected = lists:sort([Y || {X,Y} <- Data, X>=Start, X=<End]),
-                    Observed = lists:sort([Y || {_,Y} <- Result]),
-                    Observed =:= Expected;
+                    Expected = lists:reverse([Y || {X,Y} <- Data, X>=Start, X=<End]);
                 false ->
-                    Result =:= []
+                    Expected = []
             end
-    end;
+    end,
+    Observed = [Y || {_,Y} <- Result],
+    io:format("~nIn range_query: ~n",[]),
+    io:format("Expected: ~p~n",[Expected]),
+    io:format("Observed: ~p~n~n",[Observed]),
+    Expected =:= Observed;
 postcondition(S, {call,?DRIVER,all_since,[StreamName,TS]}, Result) ->
     case lists:keysearch(StreamName,1,S#state.streams) of
         {value, {StreamName,Data}} ->
-            Expected = [Y || {X,Y} <- Data, X>=TS];
+            Expected = lists:reverse([Y || {X,Y} <- Data, X>=TS]);
         false ->
             Expected = []
     end,
     Observed = [Y || {_,Y} <- Result],
-    is_subset(Expected, Observed);
+    io:format("~nIn all_since: ~n",[]),
+    io:format("Expected: ~p~n",[Expected]),
+    io:format("Observed: ~p~n~n",[Observed]),
+    Expected =:= Observed;
 postcondition(S, {call,?DRIVER,last_entry_at,[StreamName,TS]}, Result) ->
     case lists:keysearch(StreamName,1,S#state.streams) of
         {value, {StreamName,Data}} ->
-            io:format("~n[Y || {X,Y} <- Data]: ~p~n",[[Y || {X,Y} <- Data]]),%, X=<TS]]),
-            io:format("Result: ~p~n~n",[Result]),
-            true;
-%            lists:member(element(2,lists:nth(1,Result)), [Y || {X,Y} <- Data, X=<TS]);
+            Smaller = [{X,Y} || {X,Y} <- Data, X=<TS],
+            case Smaller of
+                [] ->
+                    true;
+                _ ->
+                    {_,Expected} = lists:last(lists:keysort(1,Smaller)),
+                    [{_,Observed}] = Result,
+                    io:format("~nIn last_entry_at: ~n",[]),
+                    io:format("Expected: ~p~n",[Expected]),
+                    io:format("Observed: ~p~n~n",[Observed]),
+                    Expected =:= Observed
+            end;
         false ->
-            io:format("~nResult (Should be empty): ~p~n",[Result]),
-%            Result =:= []
             true
     end;
 postcondition(_S, _V, _Result) ->
@@ -158,19 +159,17 @@ prop_cakedb_driver_works() ->
 
 % Returns a symbolic call to one of the driver's functions
 symb_call(Function, StreamName, MinTime) ->
-    timer:sleep(50), % give time to CakeDB to flush
+    Now = {call, ?MODULE, timestamp, []},
+    Diff = {call, ?MODULE, diff, [Now, MinTime]},
+    Rand = {call, random, uniform, [Diff]},
+    TS = {call, ?MODULE, sum, [MinTime, Rand]},
     case Function of
-        append ->
-            {call, ?DRIVER, append, [StreamName, list(integer(65,122))]};
         range_query ->
-            Start = integer(MinTime, timestamp()),
-            End = integer(MinTime, timestamp()),
-            {call, ?DRIVER, range_query, [StreamName, Start, End]};
+            Diff2 = {call, ?MODULE, diff, [Now, TS]},
+            Rand2 = {call, random, uniform, [Diff2]},
+            TS2 = {call, ?MODULE, sum, [TS, Rand2]},
+            {call, ?DRIVER, range_query, [StreamName, TS, TS2]};
         _ -> % all_since and last_entry_at
-            Now = {call, ?MODULE, timestamp, []},
-            Diff = {call, ?MODULE, diff, [Now, MinTime]},
-            Rand = {call, random, uniform, [Diff]},
-            TS = {call, ?MODULE, sum, [MinTime, Rand]},
             {call, ?DRIVER, Function, [StreamName, TS]}
     end.
 
@@ -179,10 +178,6 @@ diff(A,B) ->
 
 sum(A,B) ->
     A+B.
-
-% Check if list A is subset of list B
-is_subset(A,B) ->
-    lists:all(fun(X) -> lists:member(X,B) end, A).
 
 % Returns the current timestamp
 timestamp() ->

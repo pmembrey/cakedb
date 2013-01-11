@@ -44,6 +44,20 @@ init(Stream,StreamID,SliceName) ->
 	loop(Writer,[],true,0,0,Stream).
 
 loop(Writer,DataList,ClearToSend,LastTS,Count,StreamName) ->
+        case length(DataList) > 0 of
+                true ->
+                        case ClearToSend of
+                                true ->
+                                        lager:debug("Clear to send - sending what we have..."),
+                                        Writer ! {Count,LastTS,lists:reverse(DataList)},
+                                        loop(Writer,[],false,LastTS,0,StreamName);
+                                false ->
+                                        lager:debug("Got data but not clear to send..."),
+                                        ok
+                        end;
+                false ->
+                        ok
+        end,
 	receive
 		Message ->
 			case Message of 
@@ -80,20 +94,7 @@ loop(Writer,DataList,ClearToSend,LastTS,Count,StreamName) ->
 	after 5000 ->
 		% Routine maintenance 
 		erlang:garbage_collect(),
-		case ClearToSend of
-			true ->
-				case length(DataList) > 0 of
-					true ->
-						lager:debug("Clear to send but no new data in the last 5 seconds - sending what we have..."),
-						Writer ! {Count,LastTS,lists:reverse(DataList)},
-						loop(Writer,[],false,LastTS,0,StreamName);
-					false ->
-						lager:debug("Clear to send but no data..."),
-						loop(Writer,[],true,LastTS,Count,StreamName)
-				end;
-			false ->
-				loop(Writer,DataList,false,LastTS,Count,StreamName)
-		end	
+                loop(Writer,DataList,ClearToSend,LastTS,Count,StreamName)
 	end.
 
 
@@ -103,13 +104,15 @@ loop(Writer,DataList,ClearToSend,LastTS,Count,StreamName) ->
 writer_init(From,Stream,SliceName) ->
 	% First ensure stream directory exists...
 	{ok,DataDir} = application:get_env(cake,data_dir),
+	{ok,WriteDelay} = application:get_env(cake,write_delay),
 	Path = DataDir ++ binary_to_list(Stream) ++ "/",
 	filelib:ensure_dir(Path),
 	DataFile  = Path ++ SliceName ++ ".data",
 	IndexFile = Path ++ SliceName ++ ".index",
 	lager:debug("Data File:   ~p",[DataFile]),
 	lager:debug("Index File:  ~p",[IndexFile]),
-	{ok,File}   = file:open(DataFile,[append,raw,{delayed_write, 50*1024*1024, 10000}]),  % Wait for 50MB of 10 seconds before flushing
+        % Wait for 50MB or WriteDelay milliseconds before flushing
+	{ok,File}   = file:open(DataFile,[append,raw,{delayed_write, 50*1024*1024, WriteDelay}]),
 	{ok,FileInfo} = file:read_file_info(DataFile),
 	{ok,Index}  = file:open(IndexFile,[append,raw]),
 

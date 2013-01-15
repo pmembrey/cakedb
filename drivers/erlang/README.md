@@ -3,7 +3,7 @@ CakeDB Erlang Driver
 
 ###API
 
-`cakedb_driver:start_link() ->
+`cakedb_driver:start_link(Host,Port) ->
         {ok, Pid}`
 
 `cakedb_driver:append(StreamName,Data) ->

@@ -3,7 +3,7 @@
 
 -behaviour(gen_server).
 
--export([start_link/0,stop/0,append/2,range_query/3,all_since/2,last_entry_at/2]).
+-export([start_link/2,stop/0,append/2,range_query/3,all_since/2,last_entry_at/2]).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
@@ -17,8 +17,6 @@
 -define(LAST_ENTRY_AT, 6).
 
 % socket
--define(HOST,"localhost").
--define(PORT,8888).
 -define(TIMEOUT,1000).
 
 % E.g. of state structure:
@@ -36,8 +34,8 @@
 %%% CLIENT API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+start_link(Host,Port) ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [Host, Port], []).
 
 % Synchronous calls
 range_query(StreamName,Start,End) ->
@@ -60,9 +58,9 @@ append(StreamName,Data) ->
 %%% DRIVER FUNCTIONS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-init([]) ->
+init([Host, Port]) ->
     lager:info("Started basic Cake driver"),
-    {ok,Socket} = gen_tcp:connect(?HOST,?PORT,[binary,{packet, raw},{active,false}]),
+    {ok,Socket} = gen_tcp:connect(Host,Port,[binary,{packet, raw},{active,false}]),
     {ok, #state{socket=Socket, streams=[]}}.
 
 handle_call({range_query,StreamName,Start,End}, _From, State) ->

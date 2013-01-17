@@ -15,7 +15,43 @@
 %% CRC32 is processed at an upper level.
 -define(MESSAGE_PACKAGE, [TS, Size, Data]).
 
+%%%%%% TODO: Remove %%%%%%
+% Delete the TODO encapsulated code to complete merge %
+% This temporary step has to be done to prevent merge conflicts %
+% This code shouldn't compile nor run %
 
+
+retrieve_last_entry_at(StreamID,At) ->
+    {ok,File} = cake_stream_manager:stream_filename(StreamID),
+    Offset = get_indexed_offset(StreamID,At),
+    lager:debug("Offset from get_indexed_offset: ~p", [Offset]),
+    DataFile = open_data_file(File),
+    {ok,Offset} = file:position(DataFile,Offset),
+    retrieve_last_entry_at(DataFile,<<>>,At).
+
+
+retrieve_last_entry_at(DataFile,FoundData,At) ->
+    case file:read(DataFile,22) of
+        {ok,?MESSAGE_HEADER} ->
+            case file:read(DataFile,Size+3) of
+                {ok,?MESSAGE} -> case CRC32 == erlang:crc32(Data) of
+                                                true -> case TS < At of
+                                                            true -> retrieve_last_entry_at(DataFile,<<TS:64/big-integer,Size:32/big-integer,Data/binary>>,At);
+                                                            false -> ok = file:close(DataFile),
+                                                                     FoundData
+                                                        end;
+                                                false -> ok = file:close(DataFile),
+                                                         lager:warning("Message: CRC32 Checksum failed on ~p",[TS]),
+                                                         FoundData
+                                            end;
+                eof -> ok = file:close(DataFile),
+                       lager:warning("EOF: Not enough data - attempted to read ~p bytes",[Size]),
+                       FoundData
+            end;
+        _ -> ok = file:close(DataFile), 
+            FoundData
+    end.
+%%%%%% TODO END %%%%%%
 
 retrieve_last_entry_at(StreamID,At) ->
     retrieve_data(retrieve_last_entry_at, StreamID, [At])

@@ -53,12 +53,12 @@ write_delay overwritten to zero:
 
 2. In another terminal, launch Erlang from the Erlang driver
 directory:
-```bash
-$ cd /cakedb/drivers/erlang/
-$ erl
+```
+$ cd /cakedb/drivers/erlang/ebin/
+$ erl -pa ../deps/*/ebin/
 ```
 3. Run the command:
-```erlang
+```
 > proper:quickcheck(cakedb_driver_statem:prop_cakedb_driver_works(),[{numtests,20}]).
 ```
 

@@ -8,7 +8,7 @@
         postcondition/3, next_state/3, diff/2, sum/2, timestamp/0]).
 
 -define(DRIVER, cakedb_driver).
--define(TIMEOUT, 1000). % milliseconds
+-define(TIMEOUT, 500). % milliseconds
 -define(STREAMNAMES, ["tempfile", "file001", "anotherfile",
         "somefile", "binfile", "cakestream"]).
 
@@ -100,9 +100,6 @@ postcondition(S, {call,?DRIVER,range_query,[StreamName,Start,End]}, Result) ->
             end
     end,
     Observed = [Y || {_,Y} <- Result],
-    io:format("~nIn range_query: ~n",[]),
-    io:format("Expected: ~p~n",[Expected]),
-    io:format("Observed: ~p~n~n",[Observed]),
     Expected =:= Observed;
 postcondition(S, {call,?DRIVER,all_since,[StreamName,TS]}, Result) ->
     case lists:keysearch(StreamName,1,S#state.streams) of
@@ -112,9 +109,6 @@ postcondition(S, {call,?DRIVER,all_since,[StreamName,TS]}, Result) ->
             Expected = []
     end,
     Observed = [Y || {_,Y} <- Result],
-    io:format("~nIn all_since: ~n",[]),
-    io:format("Expected: ~p~n",[Expected]),
-    io:format("Observed: ~p~n~n",[Observed]),
     Expected =:= Observed;
 postcondition(S, {call,?DRIVER,last_entry_at,[StreamName,TS]}, Result) ->
     case lists:keysearch(StreamName,1,S#state.streams) of
@@ -126,9 +120,6 @@ postcondition(S, {call,?DRIVER,last_entry_at,[StreamName,TS]}, Result) ->
                 _ ->
                     {_,Expected} = lists:last(lists:keysort(1,Smaller)),
                     [{_,Observed}] = Result,
-                    io:format("~nIn last_entry_at: ~n",[]),
-                    io:format("Expected: ~p~n",[Expected]),
-                    io:format("Observed: ~p~n~n",[Observed]),
                     Expected =:= Observed
             end;
         false ->
@@ -144,7 +135,7 @@ postcondition(_S, _V, _Result) ->
 prop_cakedb_driver_works() ->
     ?FORALL(Cmds, commands(?MODULE),
         begin
-            ?DRIVER:start_link(),
+            ?DRIVER:start_link("localhost",8888),
             {History,State,Result} = run_commands(?MODULE, Cmds),
             ?DRIVER:stop(),
             ?WHENFAIL(

@@ -15,6 +15,8 @@
 %% CRC32 is processed at an upper level.
 -define(MESSAGE_PACKAGE, [TS, Size, Data]).
 
+%% Quick work around for handling decompressed data
+-define(MESSAGE_PACKAGE_DECOMPRESSED, [TS, DecompressedSize, Decompressed]).
 
 retrieve_last_entry_at(StreamID,At) ->
     retrieve_data(retrieve_last_entry_at, StreamID, [At])
@@ -58,7 +60,12 @@ retrieve_data(Operation, DataFile, FoundData, ConditionList) ->
         {ok, ?MESSAGE_HEADER} ->
             case file:read(DataFile, Size+3) of
                 {ok,?MESSAGE} -> case CRC32 == erlang:crc32(Data) of
-                                                true -> retrieve_data(Operation, DataFile, FoundData, ConditionList, ?MESSAGE_PACKAGE);
+                                                true -> case snappy:decompress(Data) of
+                                                            {ok,Decompressed} -> DecompressedSize = byte_size(Decompressed),
+                                                                         retrieve_data(Operation, DataFile, FoundData, ConditionList, ?MESSAGE_PACKAGE_DECOMPRESSED);
+                                                            SomethingElse -> lager:warning("Decompression Failed on ~p : '~p'",[TS,SomethingElse]),
+                                                            FoundData
+                                                        end;
                                                 false -> lager:warning("Message: CRC32 Checksum failed on ~p", [TS]),
                                                          FoundData
                                             end;

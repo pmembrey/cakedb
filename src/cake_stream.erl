@@ -54,9 +54,13 @@ loop(Writer,DataList,ClearToSend,LastTS,Count,StreamName) ->
 				Data ->
 
 					TS = timestamp_as_native_binary(),
+
+					% Compress the data
+					{ok,CompressedData} = snappy:compress(Data),
+
 					
-					PayloadLength = erlang:byte_size(Data),
-					Store   = <<1,1,1,TS/binary,PayloadLength:32/native-integer,(erlang:crc32(Data)):32/native-integer,2,2,2,Data/binary,3,3,3>>,
+					PayloadLength = erlang:byte_size(CompressedData),
+					Store   = <<1,1,1,TS/binary,PayloadLength:32/native-integer,(erlang:crc32(CompressedData)):32/native-integer,2,2,2,CompressedData/binary,3,3,3>>,
 
 					NewDataList = [Store|DataList],
 
@@ -191,7 +195,7 @@ fix_file(DataFile,Offset,FileName) ->
 	 case file:read(DataFile,3) of
     	{ok,<<3,3,3>>} -> lager:info("Last message found at ~p in ~p, truncating file...",[Offset,FileName]),
     					  file:truncate(DataFile);
-    	Data           -> fix_file(DataFile,NewOffset,FileName)
+    	_Data           -> fix_file(DataFile,NewOffset,FileName)
     end.
 
 

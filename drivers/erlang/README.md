@@ -46,19 +46,19 @@ To run PropEr tests:
 
 1. In one terminal, launch CakeDB with environment variable
 write_delay overwritten to zero:
-```
-$ cd /cakedb/ebin/
-$ erl -pa ../deps/*/ebin -cake write_delay 0
-> application:start(cake).
-```
+
+        $ cd /cakedb/ebin/
+        $ erl -pa ../deps/*/ebin -cake write_delay 0
+        > application:start(cake).
+
 2. In another terminal, launch Erlang from the Erlang driver
 directory:
-```
+```bash
 $ cd /cakedb/drivers/erlang/
 $ erl
 ```
 3. Run the command:
-```
+```erlang
 > proper:quickcheck(cakedb_driver_statem:prop_cakedb_driver_works(),[{numtests,20}]).
 ```
 

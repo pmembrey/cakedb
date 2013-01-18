@@ -11,7 +11,7 @@
 start() ->
     io:format(user,"Initiating tests...~n",[]),
     StartTime = timestamp(),
-    {ok, Pid} = cakedb_driver:start_link(),
+    {ok, Pid} = cakedb_driver:start_link("localhost",8888),
     {Pid,StartTime}.
  
 stop({Pid,_StartTime}) ->

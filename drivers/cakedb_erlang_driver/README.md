@@ -41,7 +41,13 @@ To run unit tests on CakeDB's Erlang driver:
 1. Insure an instance of CakeDB is running on
 host = "localhost" and port 8888.
 
-2. Then run:
+2. Launch Erlang from the Erlang driver
+directory:
+```
+$ cd /path/to/cakedb_erlang_driver/ebin/
+$ erl -pa ../deps/*/ebin/
+```
+3. Run:
 
 `> eunit:test(cakedb_driver).`
 

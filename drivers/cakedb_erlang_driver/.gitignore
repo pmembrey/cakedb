@@ -1,0 +1,8 @@
+.eunit
+deps
+priv
+*.o
+*.beam
+*.plt
+cake.app
+*.swp

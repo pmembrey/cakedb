@@ -8,7 +8,7 @@
         postcondition/3, next_state/3, diff/2, sum/2, timestamp/0]).
 
 -define(DRIVER, cakedb_driver).
--define(TIMEOUT, 500). % milliseconds
+-define(TIMEOUT, 1000). % milliseconds
 -define(STREAMNAMES, ["tempfile", "file001", "anotherfile",
         "somefile", "binfile", "cakestream"]).
 

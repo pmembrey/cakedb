@@ -1,6 +1,19 @@
 CakeDB Erlang Driver
 ======
 
+###Getting Started
+
+CakeDB's Erlang driver uses [rebar](https://github.com/basho/rebar) as
+build tool. Once installed, you can deploy the driver using the following
+commands:
+
+    $ cd /path/to/cakedb_erlang_driver/
+    $ rebar get-deps
+    $ rebar compile
+
+The cakedb_driver module with the API described below can then be used
+Erlang code.
+
 ###API
 
 `cakedb_driver:start_link(Host,Port) ->
@@ -23,18 +36,12 @@ CakeDB Erlang Driver
 
 ###EUnit testing
 
-1. Compile the cakedb_driver and cakedb_driver_tests modules:
+To run unit tests on CakeDB's Erlang driver:
 
-`> c(cakedb_driver).`
-
-and
-
-`> c(cakedb_driver_tests).`
-
-2. Insure an instance of CakeDB is running on
+1. Insure an instance of CakeDB is running on
 host = "localhost" and port 8888.
 
-3. Then run:
+2. Then run:
 
 `> eunit:test(cakedb_driver).`
 
@@ -47,14 +54,14 @@ To run PropEr tests:
 1. In one terminal, launch CakeDB with environment variable
 write_delay overwritten to zero:
 
-        $ cd /cakedb/ebin/
+        $ cd /path/to/cakedb/ebin/
         $ erl -pa ../deps/*/ebin -cake write_delay 0
         > application:start(cake).
 
 2. In another terminal, launch Erlang from the Erlang driver
 directory:
 ```
-$ cd /cakedb/drivers/erlang/ebin/
+$ cd /path/to/cakedb_erlang_driver/ebin/
 $ erl -pa ../deps/*/ebin/
 ```
 3. Run the command:

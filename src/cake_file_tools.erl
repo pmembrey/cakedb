@@ -22,8 +22,24 @@ validate(DataFile) ->
                                             false -> ok = file:close(DataFile),
                                                      lager:warning("Message: CRC32 Checksum failed on ~p",[TS])
                                             end;
+            {ok,BadData}  -> lager:warning("Corrupt data detected! Skipping to next valid header!"),
+                             NewDataFile = find_next_header(DataFile),
+                             validate(NewDataFile);
             eof -> ok = file:close(DataFile),
                    lager:warning("EOF: Not enough data - attempted to read ~p bytes",[Size])
         end;
     _ -> ok = file:close(DataFile)
 end.
+
+
+
+find_next_header(DataFile) ->
+   case file:read(DataFile,3) of
+        {ok,<<1,1,1>>}   -> {ok,Offset} = file:position(DataFile,{cur,-3}),
+                            DataFile;
+        {ok,_}           -> {ok,Offset} = file:position(DataFile,{cur,-2}),
+                            find_next_header(DataFile)
+    end.
+
+
+

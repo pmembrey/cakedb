@@ -63,7 +63,7 @@ retrieve_data(Operation, DataFile, FoundData, ConditionList) ->
                                                 true -> case snappy:decompress(Data) of
                                                             {ok,Decompressed} -> DecompressedSize = byte_size(Decompressed),
                                                                          retrieve_data(Operation, DataFile, FoundData, ConditionList, ?MESSAGE_PACKAGE_DECOMPRESSED);
-                                                            SomethingElse -> lager:warning("Decompression Failed on ~p : '~p'",[TS,SomethingElse]),
+                                                            SomethingElse -> lager:warning("Decompression Failed on ~p : '~p' -- ~p",[TS,SomethingElse,Data]),
                                                             FoundData
                                                         end;
                                                 false -> lager:warning("Message: CRC32 Checksum failed on ~p", [TS]),

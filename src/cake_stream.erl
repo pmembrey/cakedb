@@ -39,6 +39,10 @@ init(Stream,StreamID,SliceName) ->
 
 	register(list_to_atom(binary_to_list(Stream) ++ "_writer"),Writer),
 
+	gproc:await({n,l,binary_to_list(Stream) ++ "_writer"}),
+
+
+
 
 	gproc:add_local_name({stream,StreamID}),
 	loop(Writer,[],true,0,0,Stream).
@@ -72,7 +76,12 @@ loop(Writer,DataList,ClearToSend,LastTS,Count,StreamName) ->
 					% Compress the data
 					{ok,CompressedData} = snappy:compress(Data),
 
-					
+					case CompressedData == <<>> of
+						true ->	lager:warning("Discarding empty message!"),
+								loop(Writer,DataList,ClearToSend,LastTS,Count,StreamName);
+						false -> ok
+					end,
+
 					PayloadLength = erlang:byte_size(CompressedData),
 					Store   = <<1,1,1,TS/binary,PayloadLength:32/native-integer,(erlang:crc32(CompressedData)):32/native-integer,2,2,2,CompressedData/binary,3,3,3>>,
 
@@ -132,6 +141,7 @@ writer_init(From,Stream,SliceName) ->
 					},
 
 
+    gproc:add_local_name(binary_to_list(Stream) ++ "_writer"),
 	writer(Details).
 
 writer(Details) ->

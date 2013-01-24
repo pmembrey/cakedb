@@ -64,14 +64,20 @@ retrieve_data(Operation, DataFile, FoundData, ConditionList) ->
                                                             {ok,Decompressed} -> DecompressedSize = byte_size(Decompressed),
                                                                          retrieve_data(Operation, DataFile, FoundData, ConditionList, ?MESSAGE_PACKAGE_DECOMPRESSED);
                                                             SomethingElse -> lager:warning("Decompression Failed on ~p : '~p' -- ~p",[TS,SomethingElse,Data]),
-                                                            FoundData
+                                                            retrieve_data(Operation, DataFile, FoundData, ConditionList)
                                                         end;
                                                 false -> lager:warning("Message: CRC32 Checksum failed on ~p", [TS]),
-                                                         FoundData
-                                            end;
+                                                         retrieve_data(Operation, DataFile, FoundData, ConditionList)
+                                end;
+                {ok,_BadData}  -> lager:warning("Corrupt message data detected! Skipping to next valid header!"),
+                                 NewDataFile = find_next_header(DataFile),
+                                 retrieve_data(Operation,NewDataFile,FoundData,ConditionList);
                 eof -> lager:warning("EOF: Not enough data - attempted to read ~p bytes", [Size]),
                        FoundData
             end;
+        {ok,BadData}  -> lager:warning("Corrupt message header detected! Skipping to next valid header! ~p",[BadData]),
+                          NewDataFile = find_next_header(DataFile),
+                          retrieve_data(Operation,NewDataFile,FoundData,ConditionList);
         _ -> FoundData
     end
     .
@@ -144,6 +150,14 @@ get_indexed_offset(Data,From,Offset) ->
     end.
 
 
+find_next_header(DataFile) ->
+   case file:read(DataFile,3) of
+        {ok,<<1,1,1>>}   -> {ok,_Offset} = file:position(DataFile,{cur,-3}),
+                            DataFile;
+        {ok,_Data}        -> {ok,_Offset} = file:position(DataFile,{cur,-2}),
+                            find_next_header(DataFile);
+        eof              -> DataFile
+    end.
 
 
 

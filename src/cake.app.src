@@ -8,5 +8,7 @@
                   stdlib
                  ]},
   {mod, { cake_app, []}},
-  {env, [{write_delay,10000}]}
+  {env, [{write_delay,10000},
+	  {data_dir,"/data/cakedb_data/"}  % Where to store all the database files (This *MUST* have a slash on the end)
+        ]}
  ]}.

@@ -40,7 +40,7 @@ initial_state() ->
 command(S) ->
     frequency(
         [
-            {9,{call,?DRIVER,append,[elements(?STREAMNAMES),list(integer(65,122))]}},
+            {9,{call,?DRIVER,append,[elements(?STREAMNAMES), list(integer(65,122))]}},
             {1,symb_call(range_query, elements(?STREAMNAMES), S#state.starttime)},
             {1,symb_call(all_since, elements(?STREAMNAMES), S#state.starttime)},
             {1,symb_call(last_entry_at, elements(?STREAMNAMES), S#state.starttime)}
@@ -48,6 +48,8 @@ command(S) ->
     ).
 
 % define when a command is valid
+precondition(_S,{call,?DRIVER,append,[_StreamName, _Data]}) ->
+    true;
 precondition(S,{call,?DRIVER,_Query,[StreamName|_OtherArgs]}) ->
     case lists:keysearch(StreamName,1,S#state.streams) of
         {value, {StreamName,Data}} ->
@@ -61,21 +63,24 @@ precondition(S,{call,?DRIVER,_Query,[StreamName|_OtherArgs]}) ->
             end;
         false ->
             true
-    end;
-precondition(_S, _Command) ->
-    true.
+    end.
 
 % define the state transitions triggered by each command
 next_state(S,_V,{call,?DRIVER,append,[StreamName,Data]}) ->
-    case lists:keysearch(StreamName,1,S#state.streams) of
-        {value, {StreamName,OldData}} ->
-            NewTuple = {StreamName,[{timestamp(),Data}|OldData]},
-            S#state{
-                streams = lists:keyreplace(StreamName,1,S#state.streams,NewTuple)
-            };
-        false ->
-            NewTuple = {StreamName,[{timestamp(),Data}]},
-            S#state{streams = [NewTuple|S#state.streams]}
+    case Data of
+        [] ->
+            S;
+        _ ->
+            case lists:keysearch(StreamName,1,S#state.streams) of
+                {value, {StreamName,OldData}} ->
+                    NewTuple = {StreamName,[{timestamp(),Data}|OldData]},
+                    S#state{
+                        streams = lists:keyreplace(StreamName,1,S#state.streams,NewTuple)
+                    };
+                false ->
+                    NewTuple = {StreamName,[{timestamp(),Data}]},
+                    S#state{streams = [NewTuple|S#state.streams]}
+            end
     end;
 next_state(S,_V,{call,?DRIVER,_Query,[StreamName|_OtherArgs]}) ->
     case lists:keysearch(StreamName,1,S#state.streams) of

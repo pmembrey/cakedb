@@ -66,7 +66,7 @@ void query_main(const char *exename, int argc, const char * const *argv)
   saddr = parseIp(argv[0]);
   stream_name = argv[1];
   filename = argv[2];
-  ts_from = strtol(argv[3], 0, 10);
+  ts_from = strtoll(argv[3], 0, 10);
 
   query(saddr, stream_name, filename, ts_from);
 }

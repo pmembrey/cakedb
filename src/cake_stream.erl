@@ -48,9 +48,9 @@ init(Stream,StreamID,SliceName) ->
 	loop(Writer,[],true,0,0,Stream).
 
 loop(Writer,DataList,ClearToSend,LastTS,Count,StreamName) ->
-        case length(DataList) > 0 of
+        case ClearToSend of
                 true ->
-                        case ClearToSend of
+                        case Count > 0 of
                                 true ->
                                         lager:debug("Clear to send - sending what we have..."),
                                         Writer ! {Count,LastTS,lists:reverse(DataList)},

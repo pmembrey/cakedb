@@ -60,12 +60,13 @@ retrieve_data(Operation, DataFile, FoundData, ConditionList) ->
         {ok, ?MESSAGE_HEADER} ->
             case file:read(DataFile, Size+3) of
                 {ok,?MESSAGE} -> case CRC32 == erlang:crc32(Data) of
-                                                true -> case snappy:decompress(Data) of
-                                                            {ok,Decompressed} -> DecompressedSize = byte_size(Decompressed),
-                                                                         retrieve_data(Operation, DataFile, FoundData, ConditionList, ?MESSAGE_PACKAGE_DECOMPRESSED);
-                                                            SomethingElse -> lager:warning("Decompression Failed on ~p : '~p' -- ~p",[TS,SomethingElse,Data]),
-                                                            retrieve_data(Operation, DataFile, FoundData, ConditionList)
-                                                        end;
+                                                true -> %case snappy:decompress(Data) of
+                                                        %    {ok,Decompressed} -> DecompressedSize = byte_size(Decompressed),
+                                                        %                 retrieve_data(Operation, DataFile, FoundData, ConditionList, ?MESSAGE_PACKAGE_DECOMPRESSED);
+                                                        %    SomethingElse -> lager:warning("Decompression Failed on ~p : '~p' -- ~p",[TS,SomethingElse,Data]),
+                                                        %    retrieve_data(Operation, DataFile, FoundData, ConditionList)
+                                                        %end;
+                                                        retrieve_data(Operation,DataFile,FoundData,ConditionList,?MESSAGE_PACKAGE);
                                                 false -> lager:warning("Message: CRC32 Checksum failed on ~p", [TS]),
                                                          retrieve_data(Operation, DataFile, FoundData, ConditionList)
                                 end;

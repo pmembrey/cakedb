@@ -74,14 +74,16 @@ loop(Writer,DataList,ClearToSend,LastTS,Count,StreamName) ->
 					TS = timestamp_as_native_binary(),
 
 					% Compress the data
-					{ok,CompressedData} = snappy:compress(Data),
+					%{ok,CompressedData} = snappy:compress(Data),
 
-					case CompressedData == <<>> of
-						true ->	lager:warning("Discarding empty message!"),
-								loop(Writer,DataList,ClearToSend,LastTS,Count,StreamName);
-						false -> ok
-					end,
+					%case CompressedData == <<>> of
+					%	true ->	lager:warning("Discarding empty message!"),
+					%			loop(Writer,DataList,ClearToSend,LastTS,Count,StreamName);
+					%	false -> ok
+					%end,
 
+					% Nasty hack to test whether the memory leak is in the compression library
+					CompressedData = Data,
 					PayloadLength = erlang:byte_size(CompressedData),
 					Store   = <<1,1,1,TS/binary,PayloadLength:32/native-integer,(erlang:crc32(CompressedData)):32/native-integer,2,2,2,CompressedData/binary,3,3,3>>,
 

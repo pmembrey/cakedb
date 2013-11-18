@@ -19,10 +19,11 @@ start_link() ->
 
 init(_) ->
 
-	%Move this lot to configuration file later
-	application:start(gproc),
+    %Move this lot to configuration file later
+    application:start(gproc),
     application:start(compiler),
     application:start(syntax_tools),
+    application:start(goldrush),
     application:start(lager),
     lager:set_loglevel(lager_console_backend, debug),    
     lager:set_loglevel(lager_file_backend, "log/console.log", info),

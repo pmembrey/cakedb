@@ -52,11 +52,10 @@ init(_) ->
     {ok,DataDir} = application:get_env(cake,data_dir),
 
     case filelib:ensure_dir(DataDir) of
-        {error,Reason} -> lager:error("Cannot open '~p': ~p",[DataDir,Reason]);
-        ok -> cake_stream_manager:start_link(),
-              lager:info("CakeDB Ready."),
-              {ok,{}}
-
+        {error,Reason}  -> lager:error("Cannot open '~p': ~p",[DataDir,Reason]);
+        ok              -> cake_stream_manager:start_link(),
+                           lager:info("CakeDB Ready."),
+                           {ok,{}}
     end.
 
 
@@ -73,9 +72,6 @@ init(_) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-
-
-
 terminate(_Reason,_State) ->
 	ok.
 
@@ -83,10 +79,9 @@ terminate(_Reason,_State) ->
 handle_cast(stop,State) ->
 	{stop,normal,State}.
 
+
 handle_call(terminate,_From,State) ->
 	{stop,normal,ok,State}.
-
-
 
 
 handle_info(Msg,State) ->
@@ -102,8 +97,3 @@ code_change(_OldVsn, State, _Extra) ->
 
 stop() ->
 	gen_server:cast(cake,stop).
-
-
-
-
-

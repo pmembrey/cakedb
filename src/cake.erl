@@ -28,6 +28,16 @@ init(_) ->
     lager:set_loglevel(lager_console_backend, debug),    
     lager:set_loglevel(lager_file_backend, "log/console.log", info),
 
+    % Start econfig and load config file
+    application:start(econfig), 
+    % Register config file
+    econfig:register_config(cake,[code:priv_dir("cake") ++ "/cake.ini"]),
+    % Pull config 
+    Config = econfig:get_value(fixgwe,"cake"),
+    % Load values into environment...
+    application:set_env(cake, write_delay, list_to_integer(proplists:get_value("write_delay",Config))),
+    application:set_env(cake, data_dir, proplists:get_value("data_directory",Config)),
+    application:set_env(cake, listen_port, list_to_integer(proplists:get_value("listen_port",Config))), 
 
     % StatsD Start up
     %application:start(statsderl),
@@ -35,7 +45,7 @@ init(_) ->
 
     % TCP Ranch
     application:start(ranch),
-    ranch:start_listener(cake_protocol_listener,100,ranch_tcp, [{port,8888}],cake_protocol,[]),
+    ranch:start_listener(cake_protocol_listener,100,ranch_tcp, [{port,application:get_env(cake,listen_port)}],cake_protocol,[]),
 
 
     process_flag(trap_exit, true),
@@ -57,7 +67,6 @@ init(_) ->
                            lager:info("CakeDB Ready."),
                            {ok,{}}
     end.
-
 
 
 

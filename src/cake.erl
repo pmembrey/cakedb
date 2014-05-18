@@ -33,7 +33,7 @@ init(_) ->
     % Register config file
     econfig:register_config(cake,[code:priv_dir("cake") ++ "/cake.ini"]),
     % Pull config 
-    Config = econfig:get_value(fixgwe,"cake"),
+    Config = econfig:get_value(cake,"cake"),
     % Load values into environment...
     application:set_env(cake, write_delay, list_to_integer(proplists:get_value("write_delay",Config))),
     application:set_env(cake, data_dir, proplists:get_value("data_directory",Config)),

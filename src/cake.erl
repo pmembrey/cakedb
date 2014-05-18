@@ -45,7 +45,11 @@ init(_) ->
 
     % TCP Ranch
     application:start(ranch),
-    ranch:start_listener(cake_protocol_listener,100,ranch_tcp, [{port,application:get_env(cake,listen_port)}],cake_protocol,[]),
+
+    % Pull the TCP port from the environment
+    {ok,ListenPort} = application:get_env(cake,listen_port),
+    % Fire up Ranch to handle our incoming connections...
+    ranch:start_listener(cake_protocol_listener,100,ranch_tcp, [{port,ListenPort}],cake_protocol,[]),
 
 
     process_flag(trap_exit, true),
